@@ -102,7 +102,7 @@ function App() {
 
       {/* Footer */}
       <footer className="py-4 text-center text-slate-500 text-sm">
-        <div>Thaovogue Command Center v3.6.5</div>
+        <div>Thaovogue Command Center v3.6.6</div>
         <div className="text-xs mt-1">
           {isConnected ? (
             <span className="text-green-400">Connected</span>

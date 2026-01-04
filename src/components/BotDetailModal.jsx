@@ -96,25 +96,25 @@ export function BotDetailModal({ bot, onClose }) {
       <div className="bg-slate-800 rounded-xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
-          <div>
-            <h2 className="text-xl font-bold text-white">{botId}</h2>
-            <p className="text-slate-400">{displayName}</p>
+        <div className="flex items-center justify-between p-4 border-b border-slate-700 gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-white truncate">{botId}</h2>
+            <p className="text-slate-400 text-sm truncate">{displayName}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white text-2xl leading-none px-2"
+            className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white text-2xl rounded-full hover:bg-slate-700"
           >
             ×
           </button>
         </div>
 
         {/* Bot Info */}
-        <div className="p-4 border-b border-slate-700">
-          <div className="grid grid-cols-4 gap-3">
-            <div className="bg-slate-700/50 rounded p-3 text-center">
+        <div className="px-3 py-3 border-b border-slate-700">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="bg-slate-700/50 rounded p-2 text-center">
               <div className="text-xs text-slate-500">Status</div>
-              <div className={`font-bold ${
+              <div className={`font-bold text-sm ${
                 bot.status === 'RUNNING' || bot.status === 'ACTIVE'
                   ? 'text-green-400'
                   : 'text-red-400'
@@ -122,109 +122,105 @@ export function BotDetailModal({ bot, onClose }) {
                 {bot.status || 'UNKNOWN'}
               </div>
             </div>
-            <div className="bg-slate-700/50 rounded p-3 text-center">
+            <div className="bg-slate-700/50 rounded p-2 text-center">
               <div className="text-xs text-slate-500">Type</div>
-              <div className="text-white">{bot.type || '--'}</div>
+              <div className="text-white text-sm">{bot.type || '--'}</div>
             </div>
-            <div className="bg-slate-700/50 rounded p-3 text-center">
+            <div className="bg-slate-700/50 rounded p-2 text-center col-span-2 md:col-span-1">
               <div className="text-xs text-slate-500">Symbols</div>
-              <div className="text-sm text-white truncate">
+              <div className="text-xs text-white truncate">
                 {Array.isArray(bot.symbols) ? bot.symbols.join(', ') : bot.symbols || '--'}
               </div>
             </div>
-            <div className="bg-slate-700/50 rounded p-3 text-center">
+            <div className="hidden md:block bg-slate-700/50 rounded p-2 text-center">
               <div className="text-xs text-slate-500">PID</div>
-              <div className="font-mono text-sm text-white">{bot.pid || '--'}</div>
+              <div className="font-mono text-xs text-white">{bot.pid || '--'}</div>
             </div>
           </div>
         </div>
 
         {/* Stats */}
         {stats && (
-          <div className="p-4 border-b border-slate-700">
-            <div className="grid grid-cols-5 gap-3">
-              <div className="bg-slate-700/50 rounded p-3 text-center">
+          <div className="px-3 py-3 border-b border-slate-700">
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+              <div className="bg-slate-700/50 rounded p-2 text-center">
                 <div className="text-xs text-slate-500">Trades</div>
-                <div className="text-xl font-bold text-white">{stats.total_trades || 0}</div>
+                <div className="text-lg font-bold text-white">{stats.total_trades || 0}</div>
               </div>
-              <div className="bg-slate-700/50 rounded p-3 text-center">
+              <div className="bg-slate-700/50 rounded p-2 text-center">
                 <div className="text-xs text-slate-500">Win Rate</div>
-                <div className={`text-xl font-bold ${
+                <div className={`text-lg font-bold ${
                   (stats.win_rate || 0) >= 50 ? 'text-green-400' : 'text-red-400'
                 }`}>
                   {stats.win_rate || 0}%
                 </div>
               </div>
-              <div className="bg-slate-700/50 rounded p-3 text-center">
+              <div className="bg-slate-700/50 rounded p-2 text-center">
                 <div className="text-xs text-slate-500">Total P&L</div>
-                <div className={`text-xl font-bold ${
+                <div className={`text-base font-bold font-mono ${
                   (stats.total_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                 }`}>
-                  {(stats.total_pnl || 0) >= 0 ? '+' : ''}${(stats.total_pnl || 0).toFixed(2)}
+                  {(stats.total_pnl || 0) >= 0 ? '+' : ''}${(stats.total_pnl || 0).toFixed(0)}
                 </div>
               </div>
-              <div className="bg-slate-700/50 rounded p-3 text-center">
+              <div className="hidden md:block bg-slate-700/50 rounded p-2 text-center">
                 <div className="text-xs text-slate-500">Avg Win</div>
-                <div className="text-green-400 font-mono">+${(stats.avg_win || 0).toFixed(2)}</div>
+                <div className="text-green-400 font-mono text-sm">+${(stats.avg_win || 0).toFixed(0)}</div>
               </div>
-              <div className="bg-slate-700/50 rounded p-3 text-center">
+              <div className="hidden md:block bg-slate-700/50 rounded p-2 text-center">
                 <div className="text-xs text-slate-500">Avg Loss</div>
-                <div className="text-red-400 font-mono">${(stats.avg_loss || 0).toFixed(2)}</div>
+                <div className="text-red-400 font-mono text-sm">${(stats.avg_loss || 0).toFixed(0)}</div>
               </div>
             </div>
           </div>
         )}
 
         {/* Trade History */}
-        <div className="flex-1 overflow-auto p-4">
-          <h3 className="font-semibold text-white mb-3">Trade History</h3>
+        <div className="flex-1 overflow-auto px-3 py-4">
+          <h3 className="font-semibold text-white mb-3 px-1">Trade History</h3>
 
           {loading ? (
             <div className="text-center text-slate-500 py-8">Loading trades...</div>
           ) : trades.length === 0 ? (
             <div className="text-center text-slate-500 py-8">No trades found for this bot</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-sm min-w-0">
                 <thead className="bg-slate-700/50 sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left text-slate-400">Date</th>
-                    <th className="px-3 py-2 text-left text-slate-400">Symbol</th>
-                    <th className="px-3 py-2 text-right text-slate-400">Entry</th>
-                    <th className="px-3 py-2 text-right text-slate-400">Exit</th>
-                    <th className="px-3 py-2 text-right text-slate-400">P&L</th>
-                    <th className="px-3 py-2 text-left text-slate-400">Reason</th>
+                    <th className="hidden md:table-cell px-2 py-2 text-left text-slate-400 text-xs">Date</th>
+                    <th className="px-2 py-2 text-left text-slate-400 text-xs">Symbol</th>
+                    <th className="px-2 py-2 text-right text-slate-400 text-xs">Entry</th>
+                    <th className="px-2 py-2 text-right text-slate-400 text-xs">Exit</th>
+                    <th className="px-2 py-2 text-right text-slate-400 text-xs whitespace-nowrap">P&L</th>
                   </tr>
                 </thead>
                 <tbody>
                   {trades.map((trade, i) => (
                     <tr key={i} className="border-t border-slate-700/50 hover:bg-slate-700/30">
-                      <td className="px-3 py-2 font-mono text-xs text-slate-300">
+                      <td className="hidden md:table-cell px-2 py-2 font-mono text-xs text-slate-300 whitespace-nowrap">
                         {trade.date || '--'}
                       </td>
-                      <td className="px-3 py-2 text-white">{trade.symbol || '--'}</td>
-                      <td className="px-3 py-2 text-right font-mono text-slate-300">
-                        ${trade.entry_price?.toFixed(2) || '--'}
+                      <td className="px-2 py-2 text-white text-sm">{trade.symbol || '--'}</td>
+                      <td className="px-2 py-2 text-right font-mono text-xs text-slate-300">
+                        ${trade.entry_price?.toFixed(0) || '--'}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-slate-300">
+                      <td className="px-2 py-2 text-right font-mono text-xs text-slate-300">
                         {trade.exit_price ? (
                           <>
-                            ${trade.exit_price.toFixed(2)}
+                            ${trade.exit_price.toFixed(0)}
                             {trade.exit_calculated && (
-                              <span className="text-yellow-400 ml-1" title="Calculated from P&L">⚡</span>
+                              <span className="text-yellow-400 ml-0.5" title="Calculated">⚡</span>
                             )}
                           </>
                         ) : '--'}
                       </td>
-                      <td className={`px-3 py-2 text-right font-mono ${
+                      <td className={`px-2 py-2 text-right font-mono text-sm font-medium whitespace-nowrap ${
                         (trade.pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                       }`}>
                         {trade.pnl !== undefined ? (
-                          `${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(2)}`
+                          `${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(0)}`
                         ) : '--'}
-                      </td>
-                      <td className="px-3 py-2 text-slate-400 text-xs truncate max-w-[120px]">
-                        {trade.exit_reason || trade.strategy || '--'}
                       </td>
                     </tr>
                   ))}
