@@ -251,11 +251,21 @@ export function TradesTab({ bots }) {
         <div className="space-y-2">
           {trades.map(trade => {
             const isPositive = (trade.pnl || 0) >= 0;
+            const handleClick = () => {
+              console.log('Trade clicked:', trade.id, trade.symbol);
+              setSelectedTradeId(trade.id);
+            };
             return (
               <div
                 key={trade.id}
-                onClick={() => setSelectedTradeId(trade.id)}
-                className="p-4 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors flex items-center justify-between"
+                onClick={handleClick}
+                onTouchEnd={(e) => {
+                  // Prevent double-firing on mobile
+                  e.preventDefault();
+                  handleClick();
+                }}
+                className="p-4 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 active:bg-cyan-500/20 transition-colors flex items-center justify-between select-none"
+                style={{ WebkitTapHighlightColor: 'rgba(6, 182, 212, 0.3)' }}
               >
                 <div className="flex items-center gap-4">
                   <span className="text-xl">
@@ -279,7 +289,8 @@ export function TradesTab({ bots }) {
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); copyTrade(trade); }}
-                    className="text-slate-500 hover:text-slate-300 p-1"
+                    onTouchEnd={(e) => { e.stopPropagation(); }}
+                    className="text-slate-500 hover:text-slate-300 p-2 -m-1"
                     title="Copy trade"
                   >
                     📋
