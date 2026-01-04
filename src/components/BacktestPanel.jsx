@@ -243,22 +243,54 @@ export function BacktestPanel() {
         <div className="bg-slate-800/70 rounded-xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white">Results</h3>
-            <CopyButton
-              label="Copy Results"
-              getText={async () => {
-                const data = await api.fetchApi('/api/copy/backtest', {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    strategy_name: `${form.symbols} Backtest`,
-                    symbol: form.symbols,
-                    start_date: form.dateStart,
-                    end_date: form.dateEnd,
-                    ...result,
-                  }),
-                });
-                return data.text;
-              }}
-            />
+            <div className="flex gap-2">
+              <CopyButton
+                label="Copy Results"
+                getText={async () => {
+                  const data = await api.fetchApi('/api/copy/backtest', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      strategy_name: `${form.symbols} Backtest`,
+                      symbol: form.symbols,
+                      start_date: form.dateStart,
+                      end_date: form.dateEnd,
+                      ...result,
+                    }),
+                  });
+                  return data.text;
+                }}
+              />
+              <CopyButton
+                label="Copy Full Strategy"
+                getText={() => {
+                  const strategyText = `## Strategy: ${form.symbols} ${form.side}
+
+### Parameters
+- **Symbol:** ${form.symbols}
+- **Side:** ${form.side}
+- **Entry Window:** ${form.entryTimeStart} - ${form.entryTimeEnd} ET
+- **Stop Loss:** ${form.stopLossPct}%
+- **Take Profit:** ${form.takeProfitPct}%
+- **Position Sizing:** ${form.positionSizing} (${form.riskPercent}% risk on $${form.capital.toLocaleString()})
+
+### Backtest Results (${form.dateStart} to ${form.dateEnd})
+- **Total Trades:** ${result.trades_taken}
+- **Win Rate:** ${result.win_rate?.toFixed(1)}%
+- **Profit Factor:** ${result.profit_factor?.toFixed(2)}
+- **Total P&L:** ${result.total_pnl >= 0 ? '+' : ''}$${result.total_pnl?.toFixed(2)}
+
+### Trade Statistics
+- Wins: ${result.win_count} | Losses: ${result.loss_count}
+- Avg Win: +$${result.avg_win?.toFixed(2)} | Avg Loss: $${result.avg_loss?.toFixed(2)}
+- Largest Win: +$${result.largest_win?.toFixed(2)} | Largest Loss: $${result.largest_loss?.toFixed(2)}
+
+### Notes
+- Backtest run on ${new Date().toLocaleDateString()}
+- Use this strategy for ${form.side === 'LONG' ? 'bullish' : 'bearish'} setups`;
+                  return strategyText;
+                }}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

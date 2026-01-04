@@ -95,7 +95,12 @@ function TradeDetailView({ tradeId, onBack }) {
         </div>
         <div className="bg-slate-800 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Exit</div>
-          <div className="text-lg font-mono text-white">${trade.exit_price || 0}</div>
+          <div className="text-lg font-mono text-white">
+            ${trade.exit_price || 0}
+            {trade.exit_calculated && (
+              <span className="ml-1 text-yellow-400" title="Calculated from P&L">⚡</span>
+            )}
+          </div>
         </div>
         <div className="bg-slate-800 rounded-lg p-4">
           <div className="text-slate-400 text-sm mb-1">Quantity</div>
@@ -135,7 +140,10 @@ function TradeDetailView({ tradeId, onBack }) {
                     <tr key={i} className="hover:bg-slate-700/50">
                       <td className="py-2">{formatDate(t.timestamp)}</td>
                       <td className="py-2 text-right font-mono">${t.entry_price || 0}</td>
-                      <td className="py-2 text-right font-mono">${t.exit_price || 0}</td>
+                      <td className="py-2 text-right font-mono">
+                        ${t.exit_price || 0}
+                        {t.exit_calculated && <span className="ml-1 text-yellow-400" title="Calculated">⚡</span>}
+                      </td>
                       <td className={`py-2 text-right font-mono ${tPositive ? 'text-green-400' : 'text-red-400'}`}>
                         {tPositive ? '+' : ''}${(t.pnl || 0).toFixed(2)}
                       </td>
@@ -250,9 +258,16 @@ export function TradesTab({ bots }) {
                 className="p-4 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors flex items-center justify-between"
               >
                 <div className="flex items-center gap-4">
-                  <span className="text-xl">{isPositive ? '✅' : '❌'}</span>
+                  <span className="text-xl">
+                    {trade.trade_status === 'INCOMPLETE' ? '⏳' : isPositive ? '✅' : '❌'}
+                  </span>
                   <div>
-                    <div className="font-medium text-white">{trade.symbol}</div>
+                    <div className="font-medium text-white">
+                      {trade.symbol}
+                      {trade.trade_status === 'INCOMPLETE' && (
+                        <span className="ml-2 text-xs bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">OPEN</span>
+                      )}
+                    </div>
                     <div className="text-sm text-slate-500">
                       {trade.bot_name} • {formatTime(trade.timestamp)}
                     </div>

@@ -1,5 +1,5 @@
-export function BotGrid({ bots = [] }) {
-  const runningCount = bots.filter(b => b.status === 'running').length;
+export function BotGrid({ bots = [], onBotClick }) {
+  const runningCount = bots.filter(b => b.status === 'running' || b.status === 'RUNNING' || b.status === 'ACTIVE').length;
 
   const formatUptime = (seconds) => {
     if (!seconds) return '--';
@@ -28,15 +28,16 @@ export function BotGrid({ bots = [] }) {
       {/* Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {bots.map((bot) => {
-          const isRunning = bot.status === 'running';
+          const isRunning = bot.status === 'running' || bot.status === 'RUNNING' || bot.status === 'ACTIVE';
 
           return (
             <div
-              key={bot.name}
-              className={`p-3 rounded-xl border transition-all ${
+              key={bot.name || bot.id}
+              onClick={() => onBotClick && onBotClick(bot)}
+              className={`p-3 rounded-xl border transition-all cursor-pointer ${
                 isRunning
-                  ? 'bg-slate-800/70 border-green-500/30 hover:border-green-500/50'
-                  : 'bg-slate-800/30 border-slate-700/50 opacity-60'
+                  ? 'bg-slate-800/70 border-green-500/30 hover:border-cyan-500/50 hover:bg-slate-800 hover:ring-1 hover:ring-cyan-500/30'
+                  : 'bg-slate-800/30 border-slate-700/50 opacity-60 hover:opacity-80 hover:border-slate-600'
               }`}
             >
               {/* Header */}
@@ -55,7 +56,7 @@ export function BotGrid({ bots = [] }) {
 
               {/* Name */}
               <div className="font-medium text-white text-sm mb-1 truncate">
-                {bot.name.replace('BOT_', '')}
+                {(bot.name || bot.id || '').replace('BOT_', '')}
               </div>
 
               {/* Symbols */}
@@ -78,6 +79,11 @@ export function BotGrid({ bots = [] }) {
                   <span className="font-mono text-slate-400">{bot.pid}</span>
                 </div>
               )}
+
+              {/* Click hint */}
+              <div className="text-xs text-slate-600 mt-2 text-center">
+                Click for trades
+              </div>
             </div>
           );
         })}

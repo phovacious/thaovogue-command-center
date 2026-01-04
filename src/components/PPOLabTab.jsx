@@ -6,25 +6,40 @@ export function PPOLabTab() {
   const [status, setStatus] = useState(null);
   const [samples, setSamples] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [collecting, setCollecting] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const [statusData, samplesData] = await Promise.all([
+        api.fetchApi('/api/ppo/status'),
+        api.fetchApi('/api/ppo/samples?limit=20')
+      ]);
+      setStatus(statusData);
+      setSamples(samplesData.samples || []);
+    } catch (e) {
+      console.error('Failed to fetch PPO data:', e);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statusData, samplesData] = await Promise.all([
-          api.fetchApi('/api/ppo/status'),
-          api.fetchApi('/api/ppo/samples?limit=20')
-        ]);
-        setStatus(statusData);
-        setSamples(samplesData.samples || []);
-      } catch (e) {
-        console.error('Failed to fetch PPO data:', e);
-      }
-      setLoading(false);
-    };
     fetchData();
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleCollectSamples = async () => {
+    setCollecting(true);
+    try {
+      const result = await api.fetchApi('/api/ppo/collect', { method: 'POST' });
+      alert(result.message || `Collected ${result.collected} samples`);
+      await fetchData();
+    } catch (e) {
+      console.error('Failed to collect samples:', e);
+      alert('Failed to collect samples');
+    }
+    setCollecting(false);
+  };
 
   if (loading) {
     return <div className="p-8 text-center text-slate-400">Loading PPO Lab...</div>;
@@ -45,6 +60,13 @@ export function PPOLabTab() {
           <p className="text-slate-500">Reinforcement Learning Model Evolution</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={handleCollectSamples}
+            disabled={collecting}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm transition-colors disabled:opacity-50"
+          >
+            {collecting ? 'Collecting...' : '🔄 Collect Samples'}
+          </button>
           <button className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm transition-colors">
             📊 Export Samples
           </button>
@@ -158,7 +180,7 @@ export function PPOLabTab() {
                     <td className="px-4 py-2 font-mono text-slate-300">{sample.date}</td>
                     <td className="px-4 py-2 text-slate-300">{sample.state?.vix?.toFixed(2)}</td>
                     <td className="px-4 py-2 text-slate-300">{sample.state?.spx_range_pct?.toFixed(2)}%</td>
-                    <td className="px-4 py-2 text-slate-300">{dayNames[sample.state?.day_of_week] || '-'}</td>
+                    <td className="px-4 py-2 text-slate-300">{sample.state?.day_name || dayNames[sample.state?.day_of_week] || '-'}</td>
                     <td className="px-4 py-2">
                       {sample.state?.is_event_day ? (
                         <span className="text-red-400">Yes</span>

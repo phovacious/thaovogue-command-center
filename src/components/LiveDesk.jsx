@@ -4,7 +4,7 @@ import { EventsFeed } from './EventsFeed';
 import { CopyButton } from './CopyButton';
 import { useApi } from '../hooks/useApi';
 
-export function LiveDesk({ deskData }) {
+export function LiveDesk({ deskData, onBotClick }) {
   const api = useApi();
 
   const positions = deskData?.positions || [];
@@ -87,7 +87,7 @@ export function LiveDesk({ deskData }) {
       {/* Two Column Layout for Bots and Events */}
       <div className="grid md:grid-cols-2 gap-6">
         <div>
-          <BotGrid bots={bots} />
+          <BotGrid bots={bots} onBotClick={onBotClick} />
         </div>
         <div>
           <EventsFeed events={events} />

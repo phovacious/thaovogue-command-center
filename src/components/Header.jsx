@@ -1,5 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
+import { useTextSize } from '../context/TextSizeContext';
+
+function TextSizeToggle() {
+  const { textSize, setTextSize, TEXT_SIZES } = useTextSize();
+  const sizes = Object.keys(TEXT_SIZES);
+
+  return (
+    <div className="flex items-center gap-0.5 bg-slate-700 rounded px-1.5 py-1">
+      <span className="text-xs text-slate-400 mr-1">Aa</span>
+      {sizes.map((size) => (
+        <button
+          key={size}
+          onClick={() => setTextSize(size)}
+          className={`px-1.5 py-0.5 rounded text-xs transition-colors ${
+            textSize === size
+              ? 'bg-cyan-600 text-white'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          {TEXT_SIZES[size].label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const TABS = [
   { id: 'desk', label: 'Live Desk', icon: '📡' },
@@ -81,6 +106,9 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
 
           {/* Market Info */}
           <div className="hidden md:flex items-center gap-6 text-sm">
+            {/* Text Size Toggle */}
+            <TextSizeToggle />
+
             {/* Clock */}
             <div className="text-slate-300 font-mono">
               {etTime} ET
