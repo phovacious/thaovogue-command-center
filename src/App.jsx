@@ -8,6 +8,8 @@ import { BacktestPanel } from './components/BacktestPanel';
 import { TradesTab } from './components/TradesTab';
 import { PostmortemTab } from './components/PostmortemTab';
 import { StrategyLabTab } from './components/StrategyLabTab';
+import { SPXFleetTab } from './components/SPXFleetTab';
+import { PPOLabTab } from './components/PPOLabTab';
 
 function App() {
   const [activeTab, setActiveTab] = useState('desk');
@@ -66,6 +68,10 @@ function App() {
           </div>
         )}
 
+        {activeTab === 'spx' && (
+          <SPXFleetTab />
+        )}
+
         {activeTab === 'trades' && (
           <TradesTab bots={bots} />
         )}
@@ -78,6 +84,10 @@ function App() {
           <StrategyLabTab />
         )}
 
+        {activeTab === 'ppo' && (
+          <PPOLabTab />
+        )}
+
         {activeTab === 'postmortem' && (
           <PostmortemTab />
         )}
@@ -85,7 +95,7 @@ function App() {
 
       {/* Footer */}
       <footer className="py-4 text-center text-slate-500 text-sm">
-        <div>Thaovogue Command Center v3.5</div>
+        <div>Thaovogue Command Center v3.6</div>
         <div className="text-xs mt-1">
           {isConnected ? (
             <span className="text-green-400">Connected</span>

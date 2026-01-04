@@ -1,20 +1,40 @@
 import { useState, useEffect } from 'react';
+import { useApi } from '../hooks/useApi';
 
 const TABS = [
   { id: 'desk', label: 'Live Desk', icon: '📡' },
   { id: 'bots', label: 'Bots', icon: '🤖' },
+  { id: 'spx', label: 'SPX Fleet', icon: '🎯' },
   { id: 'trades', label: 'Trades', icon: '📈' },
   { id: 'backtest', label: 'Backtest', icon: '🧪' },
   { id: 'lab', label: 'Strategy Lab', icon: '📌' },
+  { id: 'ppo', label: 'PPO Lab', icon: '🧠' },
   { id: 'postmortem', label: 'Postmortem', icon: '📊' },
 ];
 
 export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketClock }) {
+  const api = useApi();
   const [time, setTime] = useState(new Date());
+  const [goLiveStatus, setGoLiveStatus] = useState({ bug_free_days: 0 });
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Fetch go-live status
+  useEffect(() => {
+    const fetchGoLive = async () => {
+      try {
+        const data = await api.fetchApi('/api/golive/status');
+        setGoLiveStatus(data);
+      } catch (e) {
+        console.error('Failed to fetch go-live status:', e);
+      }
+    };
+    fetchGoLive();
+    const interval = setInterval(fetchGoLive, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const etTime = time.toLocaleTimeString('en-US', {
@@ -74,6 +94,31 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
             {/* Trading Day */}
             <div className="text-slate-500">
               {isTradingDay ? 'Trading Day' : 'Weekend'}
+            </div>
+
+            {/* Go-Live Mini Tracker */}
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 rounded cursor-pointer hover:bg-slate-600 transition-colors"
+              onClick={() => onTabChange('spx')}
+            >
+              <span className="text-xs text-slate-400">SPX_F:</span>
+              <div className="flex items-center gap-0.5">
+                {[...Array(14)].map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-1.5 h-3 rounded-sm ${
+                      i < goLiveStatus.bug_free_days ? 'bg-green-500' : 'bg-slate-600'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className={`font-mono text-xs font-bold ${
+                goLiveStatus.bug_free_days >= 14 ? 'text-green-400' :
+                goLiveStatus.bug_free_days >= 7 ? 'text-yellow-400' : 'text-slate-300'
+              }`}>
+                {goLiveStatus.bug_free_days}/14
+              </span>
+              {goLiveStatus.bug_free_days >= 14 && <span className="text-sm">🚀</span>}
             </div>
           </div>
 
