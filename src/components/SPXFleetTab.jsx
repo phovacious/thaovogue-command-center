@@ -120,6 +120,8 @@ export function SPXFleetTab() {
   const [goLiveStatus, setGoLiveStatus] = useState({ bug_free_days: 0, incidents: [] });
   const [loading, setLoading] = useState(true);
   const [selectedBot, setSelectedBot] = useState(null);
+  const [botTrades, setBotTrades] = useState([]);
+  const [tradesLoading, setTradesLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -139,6 +141,28 @@ export function SPXFleetTab() {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch trades when a bot is selected
+  useEffect(() => {
+    if (!selectedBot) {
+      setBotTrades([]);
+      return;
+    }
+
+    const fetchTrades = async () => {
+      setTradesLoading(true);
+      try {
+        const data = await api.fetchApi(`/api/bots/${selectedBot.name}/trades`);
+        setBotTrades(data.trades || []);
+      } catch (e) {
+        console.error('Failed to fetch SPX trades:', e);
+        setBotTrades([]);
+      }
+      setTradesLoading(false);
+    };
+
+    fetchTrades();
+  }, [selectedBot]);
 
   const handleCheckin = async () => {
     try {
@@ -328,8 +352,8 @@ export function SPXFleetTab() {
 
       {/* Bot Detail Modal */}
       {selectedBot && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedBot(null)}>
-          <div className="bg-slate-800 rounded-lg w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedBot(null)}>
+          <div className="bg-slate-800 rounded-lg w-full max-w-lg max-h-[85vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-white">{selectedBot.display_name}</h3>
               <button onClick={() => setSelectedBot(null)} className="text-slate-400 hover:text-white text-2xl">×</button>
@@ -364,7 +388,7 @@ export function SPXFleetTab() {
                 <div className="font-bold text-green-400">{selectedBot.win_rate?.toFixed(1)}%</div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="bg-slate-700 rounded p-3">
                 <div className="text-slate-400 text-sm">Today P&L</div>
                 <div className={`text-xl font-bold font-mono ${selectedBot.today_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -377,6 +401,49 @@ export function SPXFleetTab() {
                   {selectedBot.month_pnl >= 0 ? '+' : ''}${selectedBot.month_pnl?.toFixed(2) || 0}
                 </div>
               </div>
+            </div>
+
+            {/* Trade History */}
+            <div className="border-t border-slate-700 pt-4">
+              <h4 className="font-semibold text-white mb-3">Trade History</h4>
+              {tradesLoading ? (
+                <div className="text-center text-slate-500 py-4">Loading trades...</div>
+              ) : botTrades.length === 0 ? (
+                <div className="text-center text-slate-500 py-4">No closed trades yet</div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-700/50 sticky top-0">
+                      <tr className="text-slate-400 text-xs">
+                        <th className="px-2 py-2 text-left">Date</th>
+                        <th className="px-2 py-2 text-right">Strike</th>
+                        <th className="px-2 py-2 text-right">Contracts</th>
+                        <th className="px-2 py-2 text-right">P&L</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {botTrades.map((trade, i) => (
+                        <tr key={i} className="border-t border-slate-700/50">
+                          <td className="px-2 py-2 text-slate-300 text-xs">
+                            {trade.date || trade.timestamp?.slice(0, 10) || '--'}
+                          </td>
+                          <td className="px-2 py-2 text-right text-slate-300 font-mono text-xs">
+                            {trade.strategy?.match(/@ ([\d.]+)/)?.[1] || '--'}
+                          </td>
+                          <td className="px-2 py-2 text-right text-slate-300 font-mono">
+                            {trade.contracts || trade.qty || '--'}
+                          </td>
+                          <td className={`px-2 py-2 text-right font-mono font-bold ${
+                            (trade.pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {(trade.pnl || 0) >= 0 ? '+' : ''}${(trade.pnl || 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
