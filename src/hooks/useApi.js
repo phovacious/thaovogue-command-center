@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://159.65.250.246:8888';
+const API_URL = import.meta.env.VITE_API_URL || 'https://ericsson-modems-cricket-civilization.trycloudflare.com';
 
 export function useApi() {
   const [loading, setLoading] = useState(false);
