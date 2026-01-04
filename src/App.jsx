@@ -102,7 +102,7 @@ function App() {
 
       {/* Footer */}
       <footer className="py-4 text-center text-slate-500 text-sm">
-        <div>Thaovogue Command Center v3.6.4</div>
+        <div>Thaovogue Command Center v3.6.5</div>
         <div className="text-xs mt-1">
           {isConnected ? (
             <span className="text-green-400">Connected</span>
@@ -112,7 +112,7 @@ function App() {
           {marketClock && (
             <span className="ml-2 text-slate-600">• {marketClock.status}</span>
           )}
-          <span className="ml-2 text-slate-600">• Build: 20260104-1800</span>
+          <span className="ml-2 text-slate-600">• Build: 20260104-2100</span>
         </div>
       </footer>
     </div>

@@ -252,7 +252,8 @@ export function TradesTab({ bots }) {
           {trades.map(trade => {
             const isPositive = (trade.pnl || 0) >= 0;
             const handleClick = () => {
-              console.log('Trade clicked:', trade.id, trade.symbol);
+              console.log('TRADE CLICKED:', trade);
+              alert(`Opening trade: ${trade.symbol} - ${trade.id}`);
               setSelectedTradeId(trade.id);
             };
             return (
@@ -264,10 +265,13 @@ export function TradesTab({ bots }) {
                   e.preventDefault();
                   handleClick();
                 }}
-                className="p-4 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 active:bg-cyan-500/20 transition-colors flex items-center justify-between select-none"
-                style={{ WebkitTapHighlightColor: 'rgba(6, 182, 212, 0.3)' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
+                className="p-4 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 hover:border-cyan-500/50 active:bg-cyan-500/20 transition-colors flex items-center justify-between select-none border-2 border-transparent"
+                style={{ WebkitTapHighlightColor: 'rgba(6, 182, 212, 0.3)', pointerEvents: 'auto' }}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 pointer-events-none">
                   <span className="text-xl">
                     {trade.trade_status === 'INCOMPLETE' ? '⏳' : isPositive ? '✅' : '❌'}
                   </span>
@@ -284,18 +288,18 @@ export function TradesTab({ bots }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className={`font-mono font-medium ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`font-mono font-medium pointer-events-none ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
                     {isPositive ? '+' : ''}${Math.abs(trade.pnl || 0).toFixed(2)}
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); copyTrade(trade); }}
-                    onTouchEnd={(e) => { e.stopPropagation(); }}
-                    className="text-slate-500 hover:text-slate-300 p-2 -m-1"
+                    onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                    className="text-slate-500 hover:text-slate-300 p-2 -m-1 relative z-10"
                     title="Copy trade"
                   >
                     📋
                   </button>
-                  <span className="text-slate-500">→</span>
+                  <span className="text-slate-500 pointer-events-none">→</span>
                 </div>
               </div>
             );
