@@ -2,16 +2,35 @@ import { useState } from 'react';
 import { useApi } from '../hooks/useApi';
 import { CopyButton } from './CopyButton';
 
+// Available symbols for backtesting
+const AVAILABLE_SYMBOLS = [
+  { group: 'Equity Bots', symbols: ['NVDA', 'TSLA', 'AMD', 'PLTR', 'META', 'GOOG', 'AAPL', 'SMCI', 'COIN'] },
+  { group: 'SPX Options', symbols: ['SPX', 'SPY'] },
+  { group: 'Crypto', symbols: ['BTC', 'ETH'] },
+];
+
+// Get last 30 days as default date range
+const getDefaultDates = () => {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0],
+  };
+};
+
 export function BacktestPanel() {
   const api = useApi();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const defaultDates = getDefaultDates();
 
   const [form, setForm] = useState({
     symbols: 'NVDA',
-    dateStart: '2024-12-01',
-    dateEnd: '2024-12-31',
+    dateStart: defaultDates.start,
+    dateEnd: defaultDates.end,
     entryTimeStart: '09:35',
     entryTimeEnd: '11:00',
     stopLossPct: 1.0,
@@ -53,14 +72,20 @@ export function BacktestPanel() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Symbols</label>
-            <input
-              type="text"
+            <label className="block text-sm text-slate-400 mb-1">Symbol</label>
+            <select
               value={form.symbols}
               onChange={(e) => setForm({ ...form, symbols: e.target.value })}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
-              placeholder="NVDA, TSLA"
-            />
+            >
+              {AVAILABLE_SYMBOLS.map(group => (
+                <optgroup key={group.group} label={group.group}>
+                  {group.symbols.map(sym => (
+                    <option key={sym} value={sym}>{sym}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
 
           <div>

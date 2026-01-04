@@ -67,26 +67,12 @@ export function LiveDesk({ deskData }) {
         </div>
       </div>
 
-      {/* Copy Buttons */}
-      <div className="flex flex-wrap gap-2">
+      {/* Copy Snapshot Button */}
+      <div className="flex">
         <CopyButton
-          label="Copy Snapshot"
+          label="📋 Copy Snapshot"
           getText={async () => {
             const data = await api.getCopySnapshot();
-            return data.text;
-          }}
-        />
-        <CopyButton
-          label="Copy for Claude"
-          getText={async () => {
-            const data = await api.getCopyClaudeContext();
-            return data.text;
-          }}
-        />
-        <CopyButton
-          label="Copy Positions"
-          getText={async () => {
-            const data = await api.getCopyPositions();
             return data.text;
           }}
         />
