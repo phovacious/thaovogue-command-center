@@ -1,31 +1,31 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 
-// Bot display name mapping
+// Bot display name mapping - includes symbols for clarity
 const BOT_DISPLAY_NAMES = {
-  // Equity Bots
-  'BOT_A': 'Equity Alpha',
-  'BOT_B': 'Equity Beta',
-  'BOT_C': 'Equity Charlie',
-  'A': 'Equity Alpha',
-  'B': 'Equity Beta',
-  'C': 'Equity Charlie',
+  // Equity Bots - with their symbols
+  'BOT_A': 'Alpha (NVDA/TSLA/AMD)',
+  'BOT_B': 'Beta (PLTR/META/GOOG)',
+  'BOT_C': 'Charlie (AAPL/SMCI/COIN)',
+  'A': 'Alpha (NVDA/TSLA/AMD)',
+  'B': 'Beta (PLTR/META/GOOG)',
+  'C': 'Charlie (AAPL/SMCI/COIN)',
 
-  // SPX Bots
-  'BOT_SPX_A': 'SPX Alpha (Legacy)',
-  'BOT_SPX_B': 'SPX Beta (35pt)',
-  'BOT_SPX_C': 'SPX Charlie (40pt)',
-  'BOT_SPX_D': 'SPX Delta (45pt)',
+  // SPX Bots - with spread width
+  'BOT_SPX_A': 'SPX Alpha (VIX-adaptive)',
+  'BOT_SPX_B': 'SPX Beta (35pt spread)',
+  'BOT_SPX_C': 'SPX Charlie (40pt spread)',
+  'BOT_SPX_D': 'SPX Delta (45pt spread)',
   'BOT_SPX_E': 'SPX Echo (Quick Exit)',
-  'BOT_SPX_F': 'SPX Foxtrot',
-  'BOT_SPX_G': 'SPX Golf (70pt Wide)',
-  'SPX_A': 'SPX Alpha (Legacy)',
-  'SPX_B': 'SPX Beta (35pt)',
-  'SPX_C': 'SPX Charlie (40pt)',
-  'SPX_D': 'SPX Delta (45pt)',
+  'BOT_SPX_F': 'SPX Foxtrot (Crown Jewels)',
+  'BOT_SPX_G': 'SPX Golf (70pt Ultra-Wide)',
+  'SPX_A': 'SPX Alpha (VIX-adaptive)',
+  'SPX_B': 'SPX Beta (35pt spread)',
+  'SPX_C': 'SPX Charlie (40pt spread)',
+  'SPX_D': 'SPX Delta (45pt spread)',
   'SPX_E': 'SPX Echo (Quick Exit)',
-  'SPX_F': 'SPX Foxtrot',
-  'SPX_G': 'SPX Golf (70pt Wide)',
+  'SPX_F': 'SPX Foxtrot (Crown Jewels)',
+  'SPX_G': 'SPX Golf (70pt Ultra-Wide)',
 
   // SPX Variants
   'BOT_SPX_A_LADDER': 'SPX Alpha Ladder',
@@ -42,11 +42,11 @@ const BOT_DISPLAY_NAMES = {
   // Special Bots
   'GODMODE': 'God Mode',
   'HIGH_CONVICTION': 'High Conviction',
-  'HIGH_CONVICTION_SWING': 'High Conviction Swing',
+  'HIGH_CONVICTION_SWING': 'HC Swing',
   'ULTRA_PRINTER': 'Ultra Printer',
   'ULTRA_EQUITY': 'Ultra Equity',
   'WALKFORWARD': 'Walk Forward',
-  'CRYPTO_ORB': 'Crypto ORB',
+  'CRYPTO_ORB': 'Crypto ORB (BTC/ETH)',
 };
 
 function getBotDisplayName(botId) {

@@ -8,49 +8,80 @@ export function CopyButton({ getText, label = 'Copy', className = '' }) {
   const handleCopy = async () => {
     setLoading(true);
     setError(null);
+
+    let text = '';
     try {
-      const text = await getText();
-
-      // Method 1: Modern Clipboard API
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-          setLoading(false);
-          return;
-        } catch (clipboardErr) {
-          console.warn('Clipboard API failed, trying fallback:', clipboardErr);
-        }
-      }
-
-      // Method 2: Fallback for older browsers / non-HTTPS / mobile Safari
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      textArea.style.position = 'fixed';
-      textArea.style.left = '-9999px';
-      textArea.style.top = '-9999px';
-      textArea.style.opacity = '0';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      textArea.setSelectionRange(0, text.length); // For mobile
-
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textArea);
-
-      if (successful) {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } else {
-        setError('Copy failed');
-        setTimeout(() => setError(null), 3000);
-      }
+      text = await getText();
+      console.log('Copy: Got text, length:', text?.length);
     } catch (err) {
-      console.error('Copy failed:', err);
-      setError('Copy failed');
+      console.error('Copy: Failed to get text:', err);
+      setError('Failed to get data');
       setTimeout(() => setError(null), 3000);
+      setLoading(false);
+      return;
     }
+
+    if (!text) {
+      console.error('Copy: No text to copy');
+      setError('No data');
+      setTimeout(() => setError(null), 3000);
+      setLoading(false);
+      return;
+    }
+
+    let success = false;
+
+    // Method 1: Modern Clipboard API (only works on HTTPS or localhost)
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        success = true;
+        console.log('Copy: Success via Clipboard API');
+      } catch (clipboardErr) {
+        console.warn('Copy: Clipboard API failed:', clipboardErr.message);
+      }
+    } else {
+      console.log('Copy: Clipboard API not available (isSecureContext:', window.isSecureContext, ')');
+    }
+
+    // Method 2: execCommand fallback (works on HTTP, older browsers, iOS Safari)
+    if (!success) {
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        // Make it invisible but still functional
+        textArea.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;padding:0;border:none;outline:none;box-shadow:none;background:transparent;';
+        textArea.setAttribute('readonly', ''); // Prevent keyboard on mobile
+        document.body.appendChild(textArea);
+
+        // iOS Safari specific
+        const range = document.createRange();
+        range.selectNodeContents(textArea);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        textArea.setSelectionRange(0, text.length); // For iOS
+
+        success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        console.log('Copy: execCommand result:', success);
+      } catch (execErr) {
+        console.error('Copy: execCommand failed:', execErr.message);
+      }
+    }
+
+    // Method 3: Last resort - show alert with text
+    if (!success) {
+      console.log('Copy: All methods failed, showing alert');
+      // Truncate for alert if too long
+      const truncated = text.length > 500 ? text.substring(0, 500) + '\n\n[...truncated]' : text;
+      alert('Could not copy automatically. Please copy manually:\n\n' + truncated);
+      setLoading(false);
+      return;
+    }
+
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
     setLoading(false);
   };
 
@@ -84,7 +115,7 @@ export function CopyButton({ getText, label = 'Copy', className = '' }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
       )}
-      {error ? 'Failed!' : copied ? 'Copied!' : label}
+      {error || (copied ? 'Copied!' : label)}
     </button>
   );
 }
