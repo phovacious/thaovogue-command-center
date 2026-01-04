@@ -114,6 +114,106 @@ function SPXBotCard({ bot, onClick, isCandidate }) {
   );
 }
 
+// SPX Trade Detail Modal
+function SPXTradeDetailModal({ trade, onClose }) {
+  if (!trade) return null;
+
+  const isPositive = (trade.pnl || 0) >= 0;
+
+  const formatDateTime = (ts) => {
+    if (!ts) return '--';
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Extract strike from strategy string like "Put Credit Spread @ 6880.0"
+  const strike = trade.strategy?.match(/@ ([\d.]+)/)?.[1] || '--';
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-800 rounded-xl w-full max-w-md overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+          <div>
+            <h3 className="text-xl font-bold text-white">SPX Put Credit Spread</h3>
+            <p className="text-slate-400 text-sm">{trade.bot_name || '--'}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white text-2xl rounded-full hover:bg-slate-700"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* P&L Hero */}
+        <div className="p-4 bg-slate-900/50 text-center">
+          <div className={`text-3xl font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+            {isPositive ? '+' : ''}${Math.abs(trade.pnl || 0).toFixed(2)}
+          </div>
+          <div className="text-sm text-slate-500 mt-1">Premium Collected</div>
+        </div>
+
+        {/* Details Grid */}
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-slate-700/50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">Short Strike</div>
+              <div className="text-white font-mono font-bold">{strike}</div>
+            </div>
+            <div className="bg-slate-700/50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">Contracts</div>
+              <div className="text-white font-mono">{trade.contracts || trade.qty || '--'}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-slate-700/50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">Entry Premium</div>
+              <div className="text-white font-mono">${trade.entry_price?.toFixed(2) || '--'}</div>
+            </div>
+            <div className="bg-slate-700/50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">Exit Premium</div>
+              <div className="text-white font-mono">${trade.exit_price?.toFixed(2) || '0.00'}</div>
+            </div>
+          </div>
+
+          <div className="bg-slate-700/50 rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">Entry Date/Time</div>
+            <div className="text-white">{formatDateTime(trade.timestamp || trade.date)}</div>
+          </div>
+
+          <div className="bg-slate-700/50 rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">Exit Reason</div>
+            <div className="text-white">{trade.exit_reason || 'Expired Worthless'}</div>
+          </div>
+        </div>
+
+        {/* Close Button */}
+        <div className="p-4 border-t border-slate-700">
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-white font-medium"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SPXFleetTab() {
   const api = useApi();
   const [fleet, setFleet] = useState({ bots: [], today_pnl: 0, month_pnl: 0, go_live_candidate: {} });
@@ -122,6 +222,7 @@ export function SPXFleetTab() {
   const [selectedBot, setSelectedBot] = useState(null);
   const [botTrades, setBotTrades] = useState([]);
   const [tradesLoading, setTradesLoading] = useState(false);
+  const [selectedTrade, setSelectedTrade] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -423,7 +524,14 @@ export function SPXFleetTab() {
                     </thead>
                     <tbody>
                       {botTrades.map((trade, i) => (
-                        <tr key={i} className="border-t border-slate-700/50">
+                        <tr
+                          key={i}
+                          onClick={() => {
+                            console.log('SPX TRADE CLICKED', trade);
+                            setSelectedTrade(trade);
+                          }}
+                          className="border-t border-slate-700/50 cursor-pointer hover:bg-slate-700/30 active:bg-cyan-500/20"
+                        >
                           <td className="px-2 py-2 text-slate-300 text-xs">
                             {trade.date || trade.timestamp?.slice(0, 10) || '--'}
                           </td>
@@ -447,6 +555,14 @@ export function SPXFleetTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* SPX Trade Detail Modal */}
+      {selectedTrade && (
+        <SPXTradeDetailModal
+          trade={selectedTrade}
+          onClose={() => setSelectedTrade(null)}
+        />
       )}
     </div>
   );
