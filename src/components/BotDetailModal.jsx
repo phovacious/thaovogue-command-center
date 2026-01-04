@@ -60,6 +60,7 @@ export function BotDetailModal({ bot, onClose }) {
   const [trades, setTrades] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedTrade, setSelectedTrade] = useState(null);
 
   const botId = bot.name || bot.id || '';
   const displayName = getBotDisplayName(botId);
@@ -197,7 +198,15 @@ export function BotDetailModal({ bot, onClose }) {
                 </thead>
                 <tbody>
                   {trades.map((trade, i) => (
-                    <tr key={i} className="border-t border-slate-700/50 hover:bg-slate-700/30">
+                    <tr
+                      key={i}
+                      onClick={() => {
+                        console.log('TRADE ROW CLICKED', trade);
+                        alert(`Trade: ${trade.symbol}\nEntry: $${trade.entry_price}\nExit: $${trade.exit_price}\nP&L: $${trade.pnl?.toFixed(2)}`);
+                        setSelectedTrade(trade);
+                      }}
+                      className="border-t border-slate-700/50 hover:bg-slate-700/30 cursor-pointer active:bg-cyan-500/20"
+                    >
                       <td className="hidden md:table-cell px-2 py-2 font-mono text-xs text-slate-300 whitespace-nowrap">
                         {trade.date || '--'}
                       </td>
