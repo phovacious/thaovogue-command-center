@@ -249,17 +249,23 @@ export function BotDetailModal({ bot, onClose }) {
         {/* Stats */}
         {stats && (
           <div className="px-3 py-3 border-b border-slate-700">
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
               <div className="bg-slate-700/50 rounded p-2 text-center">
-                <div className="text-xs text-slate-500">Trades</div>
+                <div className="text-xs text-slate-500">Closed</div>
                 <div className="text-lg font-bold text-white">{stats.total_trades || 0}</div>
               </div>
+              {(stats.open_positions || 0) > 0 && (
+                <div className="bg-yellow-500/20 rounded p-2 text-center">
+                  <div className="text-xs text-yellow-400">Open</div>
+                  <div className="text-lg font-bold text-yellow-300">{stats.open_positions}</div>
+                </div>
+              )}
               <div className="bg-slate-700/50 rounded p-2 text-center">
                 <div className="text-xs text-slate-500">Win Rate</div>
                 <div className={`text-lg font-bold ${
-                  (stats.win_rate || 0) >= 50 ? 'text-green-400' : 'text-red-400'
+                  (stats.win_rate || 0) >= 50 ? 'text-green-400' : (stats.total_trades || 0) === 0 ? 'text-slate-400' : 'text-red-400'
                 }`}>
-                  {stats.win_rate || 0}%
+                  {stats.total_trades > 0 ? `${stats.win_rate || 0}%` : '--'}
                 </div>
               </div>
               <div className="bg-slate-700/50 rounded p-2 text-center">
@@ -267,16 +273,20 @@ export function BotDetailModal({ bot, onClose }) {
                 <div className={`text-base font-bold font-mono ${
                   (stats.total_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                 }`}>
-                  {(stats.total_pnl || 0) >= 0 ? '+' : ''}${(stats.total_pnl || 0).toFixed(0)}
+                  {stats.total_trades > 0 ? `${(stats.total_pnl || 0) >= 0 ? '+' : ''}$${(stats.total_pnl || 0).toFixed(0)}` : '--'}
                 </div>
               </div>
               <div className="hidden md:block bg-slate-700/50 rounded p-2 text-center">
                 <div className="text-xs text-slate-500">Avg Win</div>
-                <div className="text-green-400 font-mono text-sm">+${(stats.avg_win || 0).toFixed(0)}</div>
+                <div className="text-green-400 font-mono text-sm">
+                  {stats.wins > 0 ? `+$${(stats.avg_win || 0).toFixed(0)}` : '--'}
+                </div>
               </div>
               <div className="hidden md:block bg-slate-700/50 rounded p-2 text-center">
                 <div className="text-xs text-slate-500">Avg Loss</div>
-                <div className="text-red-400 font-mono text-sm">${(stats.avg_loss || 0).toFixed(0)}</div>
+                <div className="text-red-400 font-mono text-sm">
+                  {stats.losses > 0 ? `$${(stats.avg_loss || 0).toFixed(0)}` : '--'}
+                </div>
               </div>
             </div>
           </div>
@@ -284,63 +294,132 @@ export function BotDetailModal({ bot, onClose }) {
 
         {/* Trade History */}
         <div className="flex-1 overflow-auto px-3 py-4">
-          <h3 className="font-semibold text-white mb-3 px-1">Trade History</h3>
-
           {loading ? (
             <div className="text-center text-slate-500 py-8">Loading trades...</div>
           ) : trades.length === 0 ? (
             <div className="text-center text-slate-500 py-8">No trades found for this bot</div>
           ) : (
-            <div className="overflow-x-auto -mx-1">
-              <table className="w-full text-sm min-w-0">
-                <thead className="bg-slate-700/50 sticky top-0">
-                  <tr>
-                    <th className="hidden md:table-cell px-2 py-2 text-left text-slate-400 text-xs">Date</th>
-                    <th className="px-2 py-2 text-left text-slate-400 text-xs">Symbol</th>
-                    <th className="px-2 py-2 text-right text-slate-400 text-xs">Entry</th>
-                    <th className="px-2 py-2 text-right text-slate-400 text-xs">Exit</th>
-                    <th className="px-2 py-2 text-right text-slate-400 text-xs whitespace-nowrap">P&L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trades.map((trade, i) => (
-                    <tr
-                      key={i}
-                      onClick={() => {
-                        console.log('TRADE ROW CLICKED', trade);
-                        setSelectedTrade(trade);
-                      }}
-                      className="border-t border-slate-700/50 hover:bg-slate-700/30 cursor-pointer active:bg-cyan-500/20"
-                    >
-                      <td className="hidden md:table-cell px-2 py-2 font-mono text-xs text-slate-300 whitespace-nowrap">
-                        {trade.date || '--'}
-                      </td>
-                      <td className="px-2 py-2 text-white text-sm">{trade.symbol || '--'}</td>
-                      <td className="px-2 py-2 text-right font-mono text-xs text-slate-300">
-                        ${trade.entry_price?.toFixed(0) || '--'}
-                      </td>
-                      <td className="px-2 py-2 text-right font-mono text-xs text-slate-300">
-                        {trade.exit_price ? (
-                          <>
-                            ${trade.exit_price.toFixed(0)}
-                            {trade.exit_calculated && (
-                              <span className="text-yellow-400 ml-0.5" title="Calculated">⚡</span>
-                            )}
-                          </>
-                        ) : '--'}
-                      </td>
-                      <td className={`px-2 py-2 text-right font-mono text-sm font-medium whitespace-nowrap ${
-                        (trade.pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        {trade.pnl !== undefined ? (
-                          `${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(0)}`
-                        ) : '--'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Open Positions Section */}
+              {(() => {
+                const openPositions = trades.filter(t => !t.exit_price && t.pnl === undefined);
+                if (openPositions.length === 0) return null;
+                return (
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-white mb-3 px-1 flex items-center gap-2">
+                      Open Positions
+                      <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                        {openPositions.length}
+                      </span>
+                    </h3>
+                    <div className="overflow-x-auto -mx-1">
+                      <table className="w-full text-sm min-w-0">
+                        <thead className="bg-yellow-500/10">
+                          <tr>
+                            <th className="hidden md:table-cell px-2 py-2 text-left text-slate-400 text-xs">Date</th>
+                            <th className="px-2 py-2 text-left text-slate-400 text-xs">Symbol</th>
+                            <th className="px-2 py-2 text-right text-slate-400 text-xs">Entry</th>
+                            <th className="px-2 py-2 text-right text-slate-400 text-xs">Qty</th>
+                            <th className="px-2 py-2 text-right text-slate-400 text-xs">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {openPositions.map((trade, i) => (
+                            <tr
+                              key={`open-${i}`}
+                              onClick={() => setSelectedTrade(trade)}
+                              className="border-t border-yellow-500/20 hover:bg-yellow-500/10 cursor-pointer"
+                            >
+                              <td className="hidden md:table-cell px-2 py-2 font-mono text-xs text-slate-300 whitespace-nowrap">
+                                {trade.date || '--'}
+                              </td>
+                              <td className="px-2 py-2 text-white text-sm">{trade.symbol || '--'}</td>
+                              <td className="px-2 py-2 text-right font-mono text-xs text-slate-300">
+                                ${trade.entry_price?.toFixed(2) || '--'}
+                              </td>
+                              <td className="px-2 py-2 text-right font-mono text-xs text-slate-300">
+                                {trade.qty || '--'}
+                              </td>
+                              <td className="px-2 py-2 text-right">
+                                <span className="text-xs bg-yellow-500/30 text-yellow-300 px-2 py-0.5 rounded font-medium">
+                                  OPEN
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Closed Trades Section */}
+              {(() => {
+                const closedTrades = trades.filter(t => t.exit_price || t.pnl !== undefined);
+                return (
+                  <div>
+                    <h3 className="font-semibold text-white mb-3 px-1 flex items-center gap-2">
+                      Trade History
+                      <span className="text-xs bg-slate-600 text-slate-300 px-2 py-0.5 rounded-full">
+                        {closedTrades.length} closed
+                      </span>
+                    </h3>
+                    {closedTrades.length === 0 ? (
+                      <div className="text-center text-slate-500 py-4">No closed trades yet</div>
+                    ) : (
+                      <div className="overflow-x-auto -mx-1">
+                        <table className="w-full text-sm min-w-0">
+                          <thead className="bg-slate-700/50 sticky top-0">
+                            <tr>
+                              <th className="hidden md:table-cell px-2 py-2 text-left text-slate-400 text-xs">Date</th>
+                              <th className="px-2 py-2 text-left text-slate-400 text-xs">Symbol</th>
+                              <th className="px-2 py-2 text-right text-slate-400 text-xs">Entry</th>
+                              <th className="px-2 py-2 text-right text-slate-400 text-xs">Exit</th>
+                              <th className="px-2 py-2 text-right text-slate-400 text-xs whitespace-nowrap">P&L</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {closedTrades.map((trade, i) => (
+                              <tr
+                                key={`closed-${i}`}
+                                onClick={() => setSelectedTrade(trade)}
+                                className="border-t border-slate-700/50 hover:bg-slate-700/30 cursor-pointer active:bg-cyan-500/20"
+                              >
+                                <td className="hidden md:table-cell px-2 py-2 font-mono text-xs text-slate-300 whitespace-nowrap">
+                                  {trade.date || '--'}
+                                </td>
+                                <td className="px-2 py-2 text-white text-sm">{trade.symbol || '--'}</td>
+                                <td className="px-2 py-2 text-right font-mono text-xs text-slate-300">
+                                  ${trade.entry_price?.toFixed(0) || '--'}
+                                </td>
+                                <td className="px-2 py-2 text-right font-mono text-xs text-slate-300">
+                                  {trade.exit_price ? (
+                                    <>
+                                      ${trade.exit_price.toFixed(0)}
+                                      {trade.exit_calculated && (
+                                        <span className="text-yellow-400 ml-0.5" title="Calculated">⚡</span>
+                                      )}
+                                    </>
+                                  ) : '--'}
+                                </td>
+                                <td className={`px-2 py-2 text-right font-mono text-sm font-medium whitespace-nowrap ${
+                                  (trade.pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                                }`}>
+                                  {trade.pnl !== undefined ? (
+                                    `${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(0)}`
+                                  ) : '--'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </>
           )}
         </div>
       </div>
