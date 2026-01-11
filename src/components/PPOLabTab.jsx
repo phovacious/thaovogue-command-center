@@ -1,12 +1,134 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 
+// PPO Sample Detail Modal
+function PPOSampleDetailModal({ sample, onClose }) {
+  if (!sample) return null;
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  const isPositive = (sample.reward || 0) >= 0;
+  const state = sample.state || {};
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-800 rounded-xl w-full max-w-md overflow-y-auto max-h-[90vh]"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-700 sticky top-0 bg-slate-800">
+          <div>
+            <h3 className="text-xl font-bold text-white">PPO Training Sample</h3>
+            <p className="text-slate-400 text-sm">{sample.date}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white text-2xl rounded-full hover:bg-slate-700"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Reward Hero */}
+        <div className="p-4 bg-slate-900/50 text-center">
+          <div className={`text-3xl font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+            {isPositive ? '+' : ''}${(sample.reward || 0).toFixed(2)}
+          </div>
+          <div className="text-sm text-slate-500 mt-1">Reward Signal</div>
+        </div>
+
+        {/* Details */}
+        <div className="p-4 space-y-3">
+          {/* Action */}
+          <div className="bg-cyan-500/20 rounded-lg p-3 border border-cyan-500/30">
+            <div className="text-xs text-cyan-400 mb-1">Action Taken</div>
+            <div className="text-white font-mono font-bold text-lg">{sample.action}</div>
+          </div>
+
+          {/* State Features */}
+          <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600/50">
+            <div className="text-xs text-purple-400 mb-2 font-medium">State Features</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-slate-500">VIX</div>
+                <div className="text-white font-mono">{state.vix?.toFixed(2) || '--'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500">SPX Range %</div>
+                <div className="text-white font-mono">{state.spx_range_pct?.toFixed(2) || '--'}%</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500">Day of Week</div>
+                <div className="text-white">{state.day_name || dayNames[state.day_of_week] || '--'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500">Event Day</div>
+                <div className={state.is_event_day ? 'text-red-400' : 'text-slate-500'}>
+                  {state.is_event_day ? 'Yes' : 'No'}
+                </div>
+              </div>
+              {state.hour !== undefined && (
+                <div>
+                  <div className="text-xs text-slate-500">Hour (ET)</div>
+                  <div className="text-white font-mono">{state.hour}:00</div>
+                </div>
+              )}
+              {state.momentum !== undefined && (
+                <div>
+                  <div className="text-xs text-slate-500">Momentum</div>
+                  <div className="text-white font-mono">{(state.momentum * 100).toFixed(2)}%</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* PPO Learning Context */}
+          <div className="bg-slate-700/50 rounded-lg p-3">
+            <div className="text-xs text-slate-400 mb-2">What PPO Learns From This</div>
+            <div className="text-sm text-slate-300">
+              {isPositive ? (
+                <>When VIX is ~{state.vix?.toFixed(1) || '?'} and range is ~{state.spx_range_pct?.toFixed(1) || '?'}%,
+                action "{sample.action}" yields +${(sample.reward || 0).toFixed(0)} → <span className="text-green-400">Reinforce this behavior</span></>
+              ) : (
+                <>When VIX is ~{state.vix?.toFixed(1) || '?'} and range is ~{state.spx_range_pct?.toFixed(1) || '?'}%,
+                action "{sample.action}" yields ${(sample.reward || 0).toFixed(0)} → <span className="text-red-400">Reduce this behavior</span></>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Close Button */}
+        <div className="p-4 border-t border-slate-700 sticky bottom-0 bg-slate-800">
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-white font-medium"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PPOLabTab() {
   const api = useApi();
   const [status, setStatus] = useState(null);
   const [samples, setSamples] = useState([]);
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
+  const [selectedSample, setSelectedSample] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -176,7 +298,11 @@ export function PPOLabTab() {
               </thead>
               <tbody>
                 {samples.map((sample, i) => (
-                  <tr key={i} className="border-t border-slate-700">
+                  <tr
+                    key={i}
+                    onClick={() => setSelectedSample(sample)}
+                    className="border-t border-slate-700 cursor-pointer hover:bg-slate-700/50 active:bg-cyan-500/20"
+                  >
                     <td className="px-4 py-2 font-mono text-slate-300">{sample.date}</td>
                     <td className="px-4 py-2 text-slate-300">{sample.state?.vix?.toFixed(2)}</td>
                     <td className="px-4 py-2 text-slate-300">{sample.state?.spx_range_pct?.toFixed(2)}%</td>
@@ -252,6 +378,14 @@ export function PPOLabTab() {
           </div>
         </div>
       </div>
+
+      {/* PPO Sample Detail Modal */}
+      {selectedSample && (
+        <PPOSampleDetailModal
+          sample={selectedSample}
+          onClose={() => setSelectedSample(null)}
+        />
+      )}
     </div>
   );
 }

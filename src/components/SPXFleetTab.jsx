@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
+import { UnifiedDetailCard } from './UnifiedDetailCard';
+
+// Crown Jewels - Best performing strategies (case-insensitive)
+const CROWN_JEWELS = ['SPX_G'];
+const isCrownJewelsBot = (name) => CROWN_JEWELS.some(cj => (name || '').toUpperCase().includes(cj));
 
 function GoLiveTracker({ bugFreeDays, incidents, onCheckin }) {
   return (
@@ -80,16 +85,19 @@ function GoLiveTracker({ bugFreeDays, incidents, onCheckin }) {
 }
 
 function SPXBotCard({ bot, onClick, isCandidate }) {
+  const isCrownJewels = isCrownJewelsBot(bot.name);
+
   return (
     <div
       className={`bg-slate-800 rounded-lg p-4 cursor-pointer hover:bg-slate-700 transition ${
         isCandidate ? 'ring-2 ring-green-500/50' : ''
-      }`}
+      } ${isCrownJewels ? 'ring-2 ring-yellow-500/50' : ''}`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          {isCandidate && <span>🚀</span>}
+          {isCrownJewels && <span title="Crown Jewels - Best Performer">👑</span>}
+          {isCandidate && !isCrownJewels && <span>🚀</span>}
           <span className="font-bold">{bot.name}</span>
         </div>
         <span className={`w-2 h-2 rounded-full ${
@@ -102,113 +110,14 @@ function SPXBotCard({ bot, onClick, isCandidate }) {
         <span className={`px-2 py-1 rounded text-xs ${
           bot.mode === 'LIVE' ? 'bg-green-500/20 text-green-400' :
           bot.mode === 'FORWARD_TESTING' ? 'bg-cyan-500/20 text-cyan-400' :
+          bot.mode === 'CONTROL' ? 'bg-amber-500/20 text-amber-400' :
           'bg-slate-600 text-slate-300'
-        }`}>
-          {bot.mode}
+        }`} title={bot.mode === 'CONTROL' ? 'Diagnostic bot - not eligible for live capital' : ''}>
+          {bot.mode === 'CONTROL' ? '🐤 CONTROL' : bot.mode}
         </span>
         <span className={`font-mono text-sm ${bot.month_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
           {bot.month_pnl >= 0 ? '+' : ''}${bot.month_pnl?.toFixed(0) || 0}
         </span>
-      </div>
-    </div>
-  );
-}
-
-// SPX Trade Detail Modal
-function SPXTradeDetailModal({ trade, onClose }) {
-  if (!trade) return null;
-
-  const isPositive = (trade.pnl || 0) >= 0;
-
-  const formatDateTime = (ts) => {
-    if (!ts) return '--';
-    const d = new Date(ts);
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Extract strike from strategy string like "Put Credit Spread @ 6880.0"
-  const strike = trade.strategy?.match(/@ ([\d.]+)/)?.[1] || '--';
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-slate-800 rounded-xl w-full max-w-md overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
-          <div>
-            <h3 className="text-xl font-bold text-white">SPX Put Credit Spread</h3>
-            <p className="text-slate-400 text-sm">{trade.bot_name || '--'}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white text-2xl rounded-full hover:bg-slate-700"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* P&L Hero */}
-        <div className="p-4 bg-slate-900/50 text-center">
-          <div className={`text-3xl font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-            {isPositive ? '+' : ''}${Math.abs(trade.pnl || 0).toFixed(2)}
-          </div>
-          <div className="text-sm text-slate-500 mt-1">Premium Collected</div>
-        </div>
-
-        {/* Details Grid */}
-        <div className="p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-700/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Short Strike</div>
-              <div className="text-white font-mono font-bold">{strike}</div>
-            </div>
-            <div className="bg-slate-700/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Contracts</div>
-              <div className="text-white font-mono">{trade.contracts || trade.qty || '--'}</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-700/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Entry Premium</div>
-              <div className="text-white font-mono">${trade.entry_price?.toFixed(2) || '--'}</div>
-            </div>
-            <div className="bg-slate-700/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Exit Premium</div>
-              <div className="text-white font-mono">${trade.exit_price?.toFixed(2) || '0.00'}</div>
-            </div>
-          </div>
-
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-xs text-slate-500 mb-1">Entry Date/Time</div>
-            <div className="text-white">{formatDateTime(trade.timestamp || trade.date)}</div>
-          </div>
-
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-xs text-slate-500 mb-1">Exit Reason</div>
-            <div className="text-white">{trade.exit_reason || 'Expired Worthless'}</div>
-          </div>
-        </div>
-
-        {/* Close Button */}
-        <div className="p-4 border-t border-slate-700">
-          <button
-            onClick={onClose}
-            className="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-white font-medium"
-          >
-            Close
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -290,7 +199,10 @@ export function SPXFleetTab() {
           <h2 className="text-xl font-bold text-white">🎯 SPX Fleet Command</h2>
           <p className="text-slate-500">0DTE Credit Spread Strategy Fleet</p>
         </div>
-        <div className="flex gap-4 text-sm">
+        <div className="flex gap-3 text-sm">
+          <div className="px-2 py-1 bg-purple-500/20 rounded">
+            <span className="text-purple-400 text-xs font-medium">SHADOW</span>
+          </div>
           <div className="bg-slate-800 rounded px-3 py-2">
             <span className="text-slate-500">Today:</span>
             <span className={`ml-2 font-mono font-bold ${fleet.today_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -313,7 +225,7 @@ export function SPXFleetTab() {
             <span className="text-2xl">🚀</span>
             <div>
               <h3 className="text-lg font-bold text-white">Go-Live Candidate: {candidate.bot}</h3>
-              <p className="text-slate-400 text-sm">35pt strikes | 100% target | 13:00 ET entry</p>
+              <p className="text-slate-400 text-sm">{candidate.display_name?.match(/\d+pt/)?.[0] || '45pt'} strikes | 100% target | 13:00 ET entry</p>
             </div>
           </div>
           <div className="text-right">
@@ -366,7 +278,7 @@ export function SPXFleetTab() {
               key={bot.name}
               bot={bot}
               onClick={() => setSelectedBot(bot)}
-              isCandidate={bot.name === 'SPX_F'}
+              isCandidate={bot.name === candidate.bot}
             />
           ))}
         </div>
@@ -389,10 +301,15 @@ export function SPXFleetTab() {
             </thead>
             <tbody>
               {fleet.bots?.map(bot => (
-                <tr key={bot.name} className="border-t border-slate-700 hover:bg-slate-700/50">
+                <tr
+                  key={bot.name}
+                  className="border-t border-slate-700 hover:bg-slate-700/50 cursor-pointer active:bg-cyan-500/20"
+                  onClick={() => setSelectedBot(bot)}
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      {bot.name === 'SPX_F' && <span>🚀</span>}
+                      {isCrownJewelsBot(bot.name) && <span title="Crown Jewels - Best Performer">👑</span>}
+                      {bot.name === 'SPX_F' && !isCrownJewelsBot(bot.name) && <span>🚀</span>}
                       <span className="font-medium text-white">{bot.display_name}</span>
                     </div>
                   </td>
@@ -400,9 +317,10 @@ export function SPXFleetTab() {
                     <span className={`px-2 py-1 rounded text-xs ${
                       bot.mode === 'LIVE' ? 'bg-green-500/20 text-green-400' :
                       bot.mode === 'FORWARD_TESTING' ? 'bg-cyan-500/20 text-cyan-400' :
+                      bot.mode === 'CONTROL' ? 'bg-amber-500/20 text-amber-400' :
                       'bg-slate-600 text-slate-300'
-                    }`}>
-                      {bot.mode}
+                    }`} title={bot.mode === 'CONTROL' ? 'Diagnostic bot - not eligible for live capital' : ''}>
+                      {bot.mode === 'CONTROL' ? '🐤 CONTROL' : bot.mode}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-400">{bot.config?.strike_distance}</td>
@@ -559,7 +477,7 @@ export function SPXFleetTab() {
 
       {/* SPX Trade Detail Modal */}
       {selectedTrade && (
-        <SPXTradeDetailModal
+        <UnifiedDetailCard
           trade={selectedTrade}
           onClose={() => setSelectedTrade(null)}
         />

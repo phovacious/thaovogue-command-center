@@ -11,14 +11,38 @@ import { PostmortemTab } from './components/PostmortemTab';
 import { StrategyLabTab } from './components/StrategyLabTab';
 import { SPXFleetTab } from './components/SPXFleetTab';
 import { PPOLabTab } from './components/PPOLabTab';
+import { LiveTradingDashboard } from './components/LiveTradingDashboard';
+import { ResearchTab } from './components/ResearchTab';
+import { CompareTab } from './components/CompareTab';
+import { RankingsTab } from './components/RankingsTab';
 
 function App() {
   const [activeTab, setActiveTab] = useState('desk');
-  const { isConnected, deskData } = useWebSocket();
+  const { isConnected, deskData, refresh: refreshWebSocket } = useWebSocket();
   const api = useApi();
   const [marketClock, setMarketClock] = useState(null);
   const [bots, setBots] = useState([]);
   const [selectedBot, setSelectedBot] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Global refresh function
+  const handleGlobalRefresh = async () => {
+    // Refresh WebSocket data if available
+    if (refreshWebSocket) {
+      refreshWebSocket();
+    }
+    // Refresh market clock
+    try {
+      const clockData = await api.fetchApi('/api/market/clock');
+      setMarketClock(clockData);
+      const botsData = await api.fetchApi('/api/bots/list');
+      setBots(botsData.bots || []);
+    } catch (e) {
+      console.error('Refresh failed:', e);
+    }
+    // Increment key to force child component refresh
+    setRefreshKey(k => k + 1);
+  };
 
   // Fetch market clock every 30 seconds
   useEffect(() => {
@@ -57,6 +81,7 @@ function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         marketClock={marketClock}
+        onRefresh={handleGlobalRefresh}
       />
 
       <main className="max-w-7xl mx-auto py-4">
@@ -74,12 +99,30 @@ function App() {
           <SPXFleetTab />
         )}
 
+        {activeTab === 'live' && (
+          <div className="px-4">
+            <LiveTradingDashboard />
+          </div>
+        )}
+
         {activeTab === 'trades' && (
           <TradesTab bots={bots} />
         )}
 
         {activeTab === 'backtest' && (
           <BacktestPanel />
+        )}
+
+        {activeTab === 'research' && (
+          <ResearchTab />
+        )}
+
+        {activeTab === 'compare' && (
+          <CompareTab />
+        )}
+
+        {activeTab === 'rankings' && (
+          <RankingsTab />
         )}
 
         {activeTab === 'lab' && (
@@ -102,7 +145,7 @@ function App() {
 
       {/* Footer */}
       <footer className="py-4 text-center text-slate-500 text-sm">
-        <div>Thaovogue Command Center v3.6.11</div>
+        <div>Thaovogue Command Center v3.8.0</div>
         <div className="text-xs mt-1">
           {isConnected ? (
             <span className="text-green-400">Connected</span>
@@ -112,7 +155,7 @@ function App() {
           {marketClock && (
             <span className="ml-2 text-slate-600">• {marketClock.status}</span>
           )}
-          <span className="ml-2 text-slate-600">• Build: 20260104-2100</span>
+          <span className="ml-2 text-slate-600">• Build: 20260108-1210</span>
         </div>
       </footer>
     </div>

@@ -30,21 +30,59 @@ const TABS = [
   { id: 'desk', label: 'Live Desk', icon: '📡' },
   { id: 'bots', label: 'Bots', icon: '🤖' },
   { id: 'spx', label: 'SPX Fleet', icon: '🎯' },
+  { id: 'live', label: 'Live Monitor', icon: '📺' },
   { id: 'trades', label: 'Trades', icon: '📈' },
   { id: 'backtest', label: 'Backtest', icon: '🧪' },
+  { id: 'research', label: 'Research', icon: '🔬' },
+  { id: 'compare', label: 'Compare', icon: '⚖️' },
+  { id: 'rankings', label: 'Rankings', icon: '🏆' },
   { id: 'lab', label: 'Strategy Lab', icon: '📌' },
   { id: 'ppo', label: 'PPO Lab', icon: '🧠' },
   { id: 'postmortem', label: 'Postmortem', icon: '📊' },
 ];
 
-export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketClock }) {
+export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketClock, onRefresh }) {
   const api = useApi();
   const [time, setTime] = useState(new Date());
   const [goLiveStatus, setGoLiveStatus] = useState({ bug_free_days: 0 });
+  const [unrealizedPnl, setUnrealizedPnl] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    if (onRefresh) {
+      await onRefresh();
+    }
+    // Also refresh local data
+    try {
+      const data = await api.fetchApi('/api/positions/live');
+      setUnrealizedPnl(data?.total_unrealized || 0);
+      const goLiveData = await api.fetchApi('/api/golive/status');
+      setGoLiveStatus(goLiveData);
+    } catch (e) {
+      console.error('Refresh failed:', e);
+    }
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Fetch unrealized P&L from live positions
+  useEffect(() => {
+    const fetchUnrealized = async () => {
+      try {
+        const data = await api.fetchApi('/api/positions/live');
+        setUnrealizedPnl(data?.total_unrealized || 0);
+      } catch (e) {
+        console.error('Failed to fetch unrealized P&L:', e);
+      }
+    };
+    fetchUnrealized();
+    const interval = setInterval(fetchUnrealized, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch go-live status
@@ -109,9 +147,21 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
             {/* Text Size Toggle */}
             <TextSizeToggle />
 
-            {/* Clock */}
-            <div className="text-slate-300 font-mono">
-              {etTime} ET
+            {/* Clock + Refresh */}
+            <div className="flex items-center gap-2">
+              <div className="text-slate-300 font-mono">
+                {etTime} ET
+              </div>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className={`p-1.5 rounded hover:bg-slate-600 transition-colors ${
+                  isRefreshing ? 'animate-spin text-cyan-400' : 'text-slate-400 hover:text-white'
+                }`}
+                title="Refresh data"
+              >
+                🔄
+              </button>
             </div>
 
             {/* Market Status */}
@@ -150,21 +200,35 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
             </div>
           </div>
 
-          {/* Daily P&L */}
-          <div className="text-right">
-            <span className="text-slate-500 text-sm hidden sm:inline">Daily: </span>
-            <span className={`font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-              {isPositive ? '+' : ''}${Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            <span className={`ml-1 text-sm ${isPositive ? 'text-green-400/70' : 'text-red-400/70'}`}>
-              ({isPositive ? '+' : ''}{pnlPct.toFixed(2)}%)
-            </span>
+          {/* Shadow P&L (Paper Trading) */}
+          <div className="text-right flex items-center gap-3">
+            <div className="px-2 py-1 bg-purple-500/20 rounded">
+              <span className="text-purple-400 text-xs font-medium">SHADOW </span>
+              <span className={`font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                {isPositive ? '+' : ''}${Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="px-2 py-1 bg-slate-700/50 rounded">
+              <span className="text-slate-500 text-xs">Open: </span>
+              <span className={`font-mono font-bold ${unrealizedPnl >= 0 ? 'text-cyan-400' : 'text-orange-400'}`}>
+                {unrealizedPnl >= 0 ? '+' : ''}${Math.abs(unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Mobile Market Info */}
         <div className="md:hidden flex items-center justify-between text-xs mb-3">
-          <span className="text-slate-300 font-mono">{etTime} ET</span>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-300 font-mono">{etTime} ET</span>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={`p-1 rounded ${isRefreshing ? 'animate-spin text-cyan-400' : 'text-slate-400'}`}
+            >
+              🔄
+            </button>
+          </div>
           <span className={`px-2 py-0.5 rounded ${statusDisplay.bg} ${statusDisplay.color}`}>
             {statusDisplay.text}
           </span>

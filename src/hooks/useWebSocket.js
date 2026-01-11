@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'wss://ericsson-modems-cricket-civilization.trycloudflare.com/ws';
+// Use direct WebSocket connection to VPS
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://159.65.250.246:8888/ws';
 
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);

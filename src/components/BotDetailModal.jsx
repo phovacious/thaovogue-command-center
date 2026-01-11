@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
+import { UnifiedDetailCard } from './UnifiedDetailCard';
 
 // Bot display name mapping - includes symbols for clarity
 const BOT_DISPLAY_NAMES = {
@@ -13,19 +14,21 @@ const BOT_DISPLAY_NAMES = {
 
   // SPX Bots - with spread width
   'BOT_SPX_A': 'SPX Alpha (VIX-adaptive)',
-  'BOT_SPX_B': 'SPX Beta (35pt spread)',
-  'BOT_SPX_C': 'SPX Charlie (40pt spread)',
-  'BOT_SPX_D': 'SPX Delta (45pt spread)',
-  'BOT_SPX_E': 'SPX Echo (Quick Exit)',
-  'BOT_SPX_F': 'SPX Foxtrot (Crown Jewels)',
-  'BOT_SPX_G': 'SPX Golf (70pt Ultra-Wide)',
+  'BOT_SPX_B': 'SPX Beta (35pt aggressive)',
+  'BOT_SPX_C': 'SPX Charlie (40pt)',
+  'BOT_SPX_D': 'SPX Delta (45pt)',
+  'BOT_SPX_E': 'SPX Echo (40pt quick exit)',
+  'BOT_SPX_F': 'SPX Foxtrot (35pt)',
+  'BOT_SPX_G': 'SPX Golf (70pt Crown Jewels)',
+  'BOT_SPX_H': 'SPX Hotel (55pt Goldilocks)',
   'SPX_A': 'SPX Alpha (VIX-adaptive)',
-  'SPX_B': 'SPX Beta (35pt spread)',
-  'SPX_C': 'SPX Charlie (40pt spread)',
-  'SPX_D': 'SPX Delta (45pt spread)',
-  'SPX_E': 'SPX Echo (Quick Exit)',
-  'SPX_F': 'SPX Foxtrot (Crown Jewels)',
-  'SPX_G': 'SPX Golf (70pt Ultra-Wide)',
+  'SPX_B': 'SPX Beta (35pt aggressive)',
+  'SPX_C': 'SPX Charlie (40pt)',
+  'SPX_D': 'SPX Delta (45pt)',
+  'SPX_E': 'SPX Echo (40pt quick exit)',
+  'SPX_F': 'SPX Foxtrot (35pt)',
+  'SPX_G': 'SPX Golf (70pt Crown Jewels)',
+  'SPX_H': 'SPX Hotel (55pt Goldilocks)',
 
   // SPX Variants
   'BOT_SPX_A_LADDER': 'SPX Alpha Ladder',
@@ -53,112 +56,6 @@ function getBotDisplayName(botId) {
   if (!botId) return 'Unknown';
   const normalized = botId.toUpperCase();
   return BOT_DISPLAY_NAMES[normalized] || BOT_DISPLAY_NAMES[normalized.replace('BOT_', '')] || botId;
-}
-
-// Trade Detail Modal
-function TradeDetailModal({ trade, onClose }) {
-  if (!trade) return null;
-
-  const isPositive = (trade.pnl || 0) >= 0;
-
-  const formatDateTime = (ts) => {
-    if (!ts) return '--';
-    const d = new Date(ts);
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-slate-800 rounded-xl w-full max-w-md overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
-          <div>
-            <h3 className="text-xl font-bold text-white">{trade.symbol || 'Trade'}</h3>
-            <p className="text-slate-400 text-sm">{trade.bot_name || trade.bot_id || '--'}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white text-2xl rounded-full hover:bg-slate-700"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* P&L Hero */}
-        <div className="p-4 bg-slate-900/50 text-center">
-          <div className={`text-3xl font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-            {isPositive ? '+' : ''}${Math.abs(trade.pnl || 0).toFixed(2)}
-          </div>
-          {trade.pnl_pct !== undefined && (
-            <div className={`text-sm ${isPositive ? 'text-green-400/70' : 'text-red-400/70'}`}>
-              {isPositive ? '+' : ''}{(trade.pnl_pct || 0).toFixed(2)}%
-            </div>
-          )}
-        </div>
-
-        {/* Details Grid */}
-        <div className="p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-700/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Side</div>
-              <div className={`font-bold ${trade.side?.toLowerCase() === 'long' ? 'text-green-400' : 'text-red-400'}`}>
-                {trade.side?.toUpperCase() || '--'}
-              </div>
-            </div>
-            <div className="bg-slate-700/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Quantity</div>
-              <div className="text-white font-mono">{trade.qty || trade.contracts || '--'}</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-700/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Entry Price</div>
-              <div className="text-white font-mono">${trade.entry_price?.toFixed(2) || '--'}</div>
-            </div>
-            <div className="bg-slate-700/50 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Exit Price</div>
-              <div className="text-white font-mono">
-                ${trade.exit_price?.toFixed(2) || '--'}
-                {trade.exit_calculated && <span className="text-yellow-400 ml-1">⚡</span>}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-xs text-slate-500 mb-1">Date/Time</div>
-            <div className="text-white">{formatDateTime(trade.timestamp || trade.entry_time || trade.date)}</div>
-          </div>
-
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-xs text-slate-500 mb-1">Exit Reason</div>
-            <div className="text-white">{trade.exit_reason || trade.strategy || '--'}</div>
-          </div>
-        </div>
-
-        {/* Close Button */}
-        <div className="p-4 border-t border-slate-700">
-          <button
-            onClick={onClose}
-            className="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-white font-medium"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function BotDetailModal({ bot, onClose }) {
@@ -426,7 +323,7 @@ export function BotDetailModal({ bot, onClose }) {
 
       {/* Trade Detail Modal */}
       {selectedTrade && (
-        <TradeDetailModal
+        <UnifiedDetailCard
           trade={selectedTrade}
           onClose={() => setSelectedTrade(null)}
         />

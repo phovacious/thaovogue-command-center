@@ -9,6 +9,11 @@ export function EventsFeed({ events = [] }) {
 
   const formatTime = (timestamp) => {
     if (!timestamp) return '--';
+    // Handle ET format: "2026-01-05 11:01:00 ET"
+    if (timestamp.includes(' ET')) {
+      const timePart = timestamp.split(' ')[1]; // "11:01:00"
+      return timePart.slice(0, 5); // "11:01"
+    }
     const date = new Date(timestamp);
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',

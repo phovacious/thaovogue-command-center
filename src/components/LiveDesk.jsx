@@ -4,6 +4,8 @@ import { BotGrid } from './BotGrid';
 import { EventsFeed } from './EventsFeed';
 import { CopyButton } from './CopyButton';
 import { useApi } from '../hooks/useApi';
+import { UnifiedDetailCard } from './UnifiedDetailCard';
+import StrategyDetailModal from './StrategyDetailModal';
 
 export function LiveDesk({ deskData, onBotClick }) {
   const api = useApi();
@@ -12,6 +14,9 @@ export function LiveDesk({ deskData, onBotClick }) {
   const [positionsCount, setPositionsCount] = useState(0);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState(null);
+  const [selectedStrategy, setSelectedStrategy] = useState(null);
+  const [allTrades, setAllTrades] = useState([]);
   const intervalRef = useRef(null);
 
   const bots = deskData?.bots || [];
@@ -55,6 +60,21 @@ export function LiveDesk({ deskData, onBotClick }) {
     };
   }, []);
 
+  // Fetch all trades when strategy is selected (for StrategyDetailModal)
+  useEffect(() => {
+    if (selectedStrategy && allTrades.length === 0) {
+      const fetchTrades = async () => {
+        try {
+          const result = await api.fetchApi('/api/trades?source=permanent&limit=500');
+          setAllTrades(result.trades || []);
+        } catch (e) {
+          console.error('Failed to fetch trades for strategy modal:', e);
+        }
+      };
+      fetchTrades();
+    }
+  }, [selectedStrategy]);
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -70,14 +90,14 @@ export function LiveDesk({ deskData, onBotClick }) {
           </div>
         </div>
 
-        {/* Equity */}
+        {/* Shadow Capital */}
         <div className="bg-slate-800/70 rounded-xl p-4 border border-slate-700/50">
-          <div className="text-sm text-slate-400 mb-1">Equity</div>
+          <div className="text-sm text-slate-400 mb-1">Shadow Capital</div>
           <div className="text-2xl font-mono font-bold text-white">
-            ${(dailyPnl.equity || 0).toLocaleString()}
+            $25,000
           </div>
-          <div className="text-sm text-slate-500">
-            BP: ${(dailyPnl.buying_power || 0).toLocaleString()}
+          <div className={`text-sm ${pnl >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
+            Month: {pnl >= 0 ? '+' : ''}${pnl.toLocaleString()}
           </div>
         </div>
 
@@ -133,8 +153,38 @@ export function LiveDesk({ deskData, onBotClick }) {
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
           )}
         </h3>
-        <LivePositionsTable positions={livePositions} />
+        <LivePositionsTable positions={livePositions} onPositionClick={setSelectedPosition} />
       </div>
+
+      {/* Position Detail Modal */}
+      {selectedPosition && (
+        <UnifiedDetailCard
+          trade={{
+            ...selectedPosition,
+            pnl: selectedPosition.unrealized_pnl,
+            pnl_pct: selectedPosition.unrealized_pnl_pct,
+            side: 'LONG',
+          }}
+          onClose={() => setSelectedPosition(null)}
+          onStrategyClick={(strat) => {
+            setSelectedPosition(null);
+            setSelectedStrategy(strat);
+          }}
+        />
+      )}
+
+      {/* Strategy Detail Modal */}
+      {selectedStrategy && (
+        <StrategyDetailModal
+          strategy={selectedStrategy}
+          trades={allTrades}
+          onClose={() => setSelectedStrategy(null)}
+          onTradeClick={(trade) => {
+            setSelectedStrategy(null);
+            setSelectedPosition(trade);
+          }}
+        />
+      )}
 
       {/* Two Column Layout for Bots and Events */}
       <div className="grid md:grid-cols-2 gap-6">
@@ -150,7 +200,7 @@ export function LiveDesk({ deskData, onBotClick }) {
 }
 
 // Live Positions Table with visual indicators
-function LivePositionsTable({ positions = [] }) {
+function LivePositionsTable({ positions = [], onPositionClick }) {
   if (!positions || positions.length === 0) {
     return (
       <div className="bg-slate-800/50 rounded-xl p-6 text-center">
@@ -200,7 +250,8 @@ function LivePositionsTable({ positions = [] }) {
               return (
                 <tr
                   key={idx}
-                  className={`hover:bg-slate-700/30 transition-colors ${
+                  onClick={() => onPositionClick && onPositionClick(pos)}
+                  className={`hover:bg-slate-700/30 transition-colors cursor-pointer active:bg-cyan-500/20 ${
                     priceChange === 'up' ? 'animate-pulse-green' :
                     priceChange === 'down' ? 'animate-pulse-red' : ''
                   }`}

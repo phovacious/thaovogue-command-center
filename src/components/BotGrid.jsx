@@ -1,5 +1,14 @@
+// Crown Jewels - Best performing strategies (case-insensitive matching)
+const CROWN_JEWELS = ['SPX_G'];
+
 export function BotGrid({ bots = [], onBotClick }) {
   const runningCount = bots.filter(b => b.status === 'running' || b.status === 'RUNNING' || b.status === 'ACTIVE').length;
+
+  // Case-insensitive check for Crown Jewels
+  const isCrownJewels = (botName) => {
+    const upper = (botName || '').toUpperCase();
+    return CROWN_JEWELS.some(cj => upper.includes(cj));
+  };
 
   const formatUptime = (seconds) => {
     if (!seconds) return '--';
@@ -42,9 +51,16 @@ export function BotGrid({ bots = [], onBotClick }) {
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  isRunning ? 'bg-green-400 pulse-green' : 'bg-slate-500'
-                }`} />
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-2 h-2 rounded-full ${
+                    isRunning ? 'bg-green-400 pulse-green' : 'bg-slate-500'
+                  }`} />
+                  {isCrownJewels(bot.name || bot.id) && (
+                    <span className="text-yellow-400 text-xs" title="Crown Jewels - Best Performer">
+                      👑
+                    </span>
+                  )}
+                </div>
                 <span className={`text-xs px-1.5 py-0.5 rounded ${
                   isRunning
                     ? 'bg-green-500/20 text-green-400'
