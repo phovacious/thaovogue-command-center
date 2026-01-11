@@ -36,6 +36,7 @@ const TABS = [
   { id: 'research', label: 'Research', icon: '🔬' },
   { id: 'compare', label: 'Compare', icon: '⚖️' },
   { id: 'rankings', label: 'Rankings', icon: '🏆' },
+  { id: 'validate', label: 'Validate', icon: '✅' },
   { id: 'lab', label: 'Strategy Lab', icon: '📌' },
   { id: 'ppo', label: 'PPO Lab', icon: '🧠' },
   { id: 'postmortem', label: 'Postmortem', icon: '📊' },

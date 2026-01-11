@@ -15,6 +15,7 @@ import { LiveTradingDashboard } from './components/LiveTradingDashboard';
 import { ResearchTab } from './components/ResearchTab';
 import { CompareTab } from './components/CompareTab';
 import { RankingsTab } from './components/RankingsTab';
+import { ValidateTab } from './components/ValidateTab';
 
 function App() {
   const [activeTab, setActiveTab] = useState('desk');
@@ -125,6 +126,10 @@ function App() {
           <RankingsTab />
         )}
 
+        {activeTab === 'validate' && (
+          <ValidateTab />
+        )}
+
         {activeTab === 'lab' && (
           <StrategyLabTab />
         )}
@@ -145,7 +150,7 @@ function App() {
 
       {/* Footer */}
       <footer className="py-4 text-center text-slate-500 text-sm">
-        <div>Thaovogue Command Center v3.8.0</div>
+        <div>Thaovogue Command Center v3.9.0</div>
         <div className="text-xs mt-1">
           {isConnected ? (
             <span className="text-green-400">Connected</span>
