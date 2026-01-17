@@ -24,12 +24,284 @@ function TierBadge({ tier }) {
     'SOLID': { bg: 'bg-blue-500/20', text: 'text-blue-400' },
     'SPECULATIVE': { bg: 'bg-orange-500/20', text: 'text-orange-400' },
     'AVOID': { bg: 'bg-red-500/20', text: 'text-red-400' },
+    'UNKNOWN': { bg: 'bg-slate-500/20', text: 'text-slate-400' },
   };
-  const c = config[tier] || config['AVOID'];
+  const c = config[tier] || config['UNKNOWN'];
   return (
     <span className={`px-1.5 py-0.5 rounded text-xs ${c.bg} ${c.text}`}>
       {tier}
     </span>
+  );
+}
+
+// Urgency badge component
+function UrgencyBadge({ urgency, icon }) {
+  const config = {
+    'HIGH': { bg: 'bg-red-500/20', text: 'text-red-400' },
+    'MEDIUM': { bg: 'bg-yellow-500/20', text: 'text-yellow-400' },
+    'LOW': { bg: 'bg-green-500/20', text: 'text-green-400' },
+    'VERY_LOW': { bg: 'bg-slate-500/20', text: 'text-slate-300' },
+    'WAIT': { bg: 'bg-purple-500/20', text: 'text-purple-400' },
+  };
+  const c = config[urgency] || config['WAIT'];
+  return (
+    <span className={`px-2 py-1 rounded text-sm font-bold ${c.bg} ${c.text} flex items-center gap-1`}>
+      <span>{icon}</span> {urgency.replace('_', ' ')}
+    </span>
+  );
+}
+
+// DCA Recommendation Modal
+function DCARecommendationModal({ data, onClose }) {
+  if (!data) return null;
+
+  const isRisky = data.tier === 'SPECULATIVE' || data.tier === 'AVOID' || data.tier === 'UNKNOWN';
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-lg max-w-2xl w-full max-h-[85vh] overflow-hidden">
+        {/* Header */}
+        <div className="p-4 border-b border-slate-700 flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-white">{data.ticker}</h2>
+              <TierBadge tier={data.tier} />
+              {data.hold_ok && <span className="text-green-400 text-sm">✅</span>}
+            </div>
+            <p className="text-sm text-slate-400">{data.company_name}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">×</button>
+        </div>
+
+        <div className="p-4 overflow-y-auto max-h-[65vh] space-y-4">
+          {/* Price Info */}
+          <div className="grid grid-cols-3 gap-4 bg-slate-700/50 rounded-lg p-4">
+            <div className="text-center">
+              <div className="text-xs text-slate-400">Current</div>
+              <div className="text-xl font-mono text-white">${data.current_price}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-slate-400">52W High</div>
+              <div className="text-xl font-mono text-cyan-400">${data.high_52w}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-slate-400">Distance</div>
+              <div className={`text-xl font-mono font-bold ${
+                data.distance_from_high >= 25 ? 'text-red-400' :
+                data.distance_from_high >= 15 ? 'text-orange-400' :
+                data.distance_from_high >= 5 ? 'text-yellow-400' : 'text-green-400'
+              }`}>
+                -{data.distance_from_high}%
+              </div>
+            </div>
+          </div>
+
+          {/* Thesis */}
+          {data.thesis && (
+            <div className="bg-slate-700/30 rounded-lg p-3">
+              <div className="text-xs text-slate-400 mb-1">Investment Thesis</div>
+              <div className="text-sm text-white">{data.thesis}</div>
+            </div>
+          )}
+
+          {/* Warnings */}
+          {data.warnings?.length > 0 && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              {data.warnings.map((w, i) => (
+                <div key={i} className="text-sm text-red-400">{w}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Adaptive DCA Recommendation */}
+          <div className="bg-slate-700/50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                📊 Adaptive DCA Recommendation
+              </h3>
+              <UrgencyBadge urgency={data.urgency} icon={data.urgency_icon} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <div className="text-xs text-slate-400">Tranches</div>
+                <div className="text-lg font-mono text-white">{data.tranches}</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-400">Strategy</div>
+                <div className="text-sm text-cyan-400">{data.reasoning}</div>
+              </div>
+            </div>
+
+            {/* Schedule */}
+            <div className="mt-4">
+              <div className="text-xs text-slate-400 mb-2">
+                Schedule for ${data.amount.toLocaleString()}:
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {data.schedule.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-16 text-xs text-slate-500">Week {s.week}</div>
+                    <div className="flex-1 h-6 bg-slate-600 rounded-full overflow-hidden relative">
+                      <div
+                        className={`h-full ${
+                          i === 0 && data.urgency === 'HIGH' ? 'bg-red-500' :
+                          i === 0 ? 'bg-cyan-500' : 'bg-cyan-600/70'
+                        }`}
+                        style={{ width: `${s.pct * 2}%` }}
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center text-xs text-white font-mono">
+                        ${s.amount} ({s.pct}%)
+                      </span>
+                    </div>
+                    <div className="w-20 text-xs text-slate-400 text-right">
+                      ~{s.shares} shares
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Fundamentals */}
+          {data.fundamentals && (
+            <div className="bg-slate-700/30 rounded-lg p-4">
+              <h3 className="font-bold text-white mb-3">📈 Fundamentals</h3>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                {data.fundamentals.pe_ratio && (
+                  <div>
+                    <div className="text-xs text-slate-400">P/E Ratio</div>
+                    <div className={`font-mono ${data.fundamentals.pe_ratio > 30 ? 'text-orange-400' : 'text-white'}`}>
+                      {data.fundamentals.pe_ratio}
+                    </div>
+                  </div>
+                )}
+                {data.fundamentals.forward_pe && (
+                  <div>
+                    <div className="text-xs text-slate-400">Forward P/E</div>
+                    <div className="font-mono text-white">{data.fundamentals.forward_pe}</div>
+                  </div>
+                )}
+                {data.fundamentals.market_cap_b && (
+                  <div>
+                    <div className="text-xs text-slate-400">Market Cap</div>
+                    <div className="font-mono text-white">${data.fundamentals.market_cap_b}B</div>
+                  </div>
+                )}
+                {data.fundamentals.fcf_m && (
+                  <div>
+                    <div className="text-xs text-slate-400">Free Cash Flow</div>
+                    <div className={`font-mono ${data.fundamentals.fcf_m > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      ${data.fundamentals.fcf_m}M
+                    </div>
+                  </div>
+                )}
+                {data.fundamentals.debt_to_equity && (
+                  <div>
+                    <div className="text-xs text-slate-400">Debt/Equity</div>
+                    <div className={`font-mono ${data.fundamentals.debt_to_equity > 100 ? 'text-orange-400' : 'text-white'}`}>
+                      {data.fundamentals.debt_to_equity}%
+                    </div>
+                  </div>
+                )}
+                {data.fundamentals.sector && (
+                  <div>
+                    <div className="text-xs text-slate-400">Sector</div>
+                    <div className="text-white">{data.fundamentals.sector}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-700 bg-slate-900/50">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500">
+              {data.hold_ok ? '✅ Safe for 1-year hold' : '⚠️ Day trade only'}
+            </div>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// DCA Analyzer Component
+function DCAAnalyzer({ api }) {
+  const [ticker, setTicker] = useState('');
+  const [amount, setAmount] = useState(1000);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  const analyze = async () => {
+    if (!ticker) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${ticker.toUpperCase()}&amount=${amount}`);
+      if (data.status === 'ok') {
+        setResult(data);
+      } else {
+        setError(data.message || 'Failed to analyze');
+      }
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <>
+      <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+        <h3 className="font-bold text-white mb-3 flex items-center gap-2">
+          🔍 DCA Analyzer
+        </h3>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value.toUpperCase())}
+            placeholder="Ticker (e.g., AAPL)"
+            className="flex-1 px-3 py-2 bg-slate-700 rounded text-white placeholder-slate-500 font-mono"
+            onKeyDown={(e) => e.key === 'Enter' && analyze()}
+          />
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            placeholder="Amount"
+            className="w-28 px-3 py-2 bg-slate-700 rounded text-white font-mono"
+          />
+          <button
+            onClick={analyze}
+            disabled={loading || !ticker}
+            className={`px-4 py-2 rounded font-medium transition-colors ${
+              loading || !ticker
+                ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                : 'bg-cyan-600 hover:bg-cyan-500 text-white'
+            }`}
+          >
+            {loading ? '...' : 'Analyze'}
+          </button>
+        </div>
+        {error && (
+          <div className="mt-2 text-sm text-red-400">{error}</div>
+        )}
+      </div>
+
+      {result && (
+        <DCARecommendationModal data={result} onClose={() => setResult(null)} />
+      )}
+    </>
   );
 }
 
@@ -63,8 +335,8 @@ function BasketCard({ basket, onSelect }) {
   );
 }
 
-// Basket Detail Modal
-function BasketDetailModal({ basket, onClose }) {
+// Basket Detail Modal with DCA for each holding
+function BasketDetailModal({ basket, onClose, onAnalyzeTicker }) {
   if (!basket) return null;
 
   return (
@@ -89,11 +361,22 @@ function BasketDetailModal({ basket, onClose }) {
                 {basket.safe_holdings.map((h, i) => (
                   <div key={i} className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-white font-bold">{h.ticker}</span>
+                      <button
+                        onClick={() => onAnalyzeTicker(h.ticker)}
+                        className="font-mono text-white font-bold hover:text-cyan-400 transition-colors"
+                      >
+                        {h.ticker}
+                      </button>
                       <TierBadge tier={h.tier} />
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-3">
                       <span className="text-cyan-400 font-mono">{(h.weight * 100).toFixed(0)}%</span>
+                      <button
+                        onClick={() => onAnalyzeTicker(h.ticker)}
+                        className="text-xs px-2 py-1 bg-slate-600 hover:bg-slate-500 rounded text-slate-300"
+                      >
+                        DCA
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -111,11 +394,22 @@ function BasketDetailModal({ basket, onClose }) {
                 {basket.risky_holdings.map((h, i) => (
                   <div key={i} className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-white font-bold">{h.ticker}</span>
+                      <button
+                        onClick={() => onAnalyzeTicker(h.ticker)}
+                        className="font-mono text-white font-bold hover:text-orange-400 transition-colors"
+                      >
+                        {h.ticker}
+                      </button>
                       <TierBadge tier={h.tier} />
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-3">
                       <span className="text-orange-400 font-mono">{(h.weight * 100).toFixed(0)}%</span>
+                      <button
+                        onClick={() => onAnalyzeTicker(h.ticker)}
+                        className="text-xs px-2 py-1 bg-slate-600 hover:bg-slate-500 rounded text-slate-300"
+                      >
+                        DCA
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -146,7 +440,7 @@ function BasketDetailModal({ basket, onClose }) {
 
         <div className="p-4 border-t border-slate-700 bg-slate-900/50">
           <p className="text-sm text-slate-400">
-            <span className="text-cyan-400 font-bold">Recommendation:</span> {basket.recommendation}
+            <span className="text-cyan-400 font-bold">Tip:</span> Click any ticker to see adaptive DCA recommendation
           </p>
         </div>
       </div>
@@ -154,10 +448,13 @@ function BasketDetailModal({ basket, onClose }) {
   );
 }
 
-// DCA Opportunity Card
-function DCAOpportunityCard({ opportunity }) {
+// DCA Opportunity Card (enhanced)
+function DCAOpportunityCard({ opportunity, onAnalyze }) {
   return (
-    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+    <div
+      className="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-cyan-500/50 cursor-pointer transition-colors"
+      onClick={() => onAnalyze(opportunity.ticker)}
+    >
       <div className="flex justify-between items-start mb-2">
         <div>
           <span className="font-mono text-lg font-bold text-white">{opportunity.ticker}</span>
@@ -172,6 +469,7 @@ function DCAOpportunityCard({ opportunity }) {
         <span className="text-slate-500">Regime: <span className="text-cyan-400">{opportunity.regime}</span></span>
         <span className="text-slate-500">Tranche: <span className="text-yellow-400">{opportunity.tranche}/5</span></span>
       </div>
+      <div className="mt-2 text-xs text-cyan-400">Click for DCA schedule →</div>
     </div>
   );
 }
@@ -185,20 +483,30 @@ export function ValueTab() {
   const [selectedBasket, setSelectedBasket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dcaResult, setDcaResult] = useState(null);
+
+  const analyzeTicker = async (ticker) => {
+    try {
+      const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${ticker}&amount=1000`);
+      if (data.status === 'ok') {
+        setDcaResult(data);
+        setSelectedBasket(null); // Close basket modal
+      }
+    } catch (e) {
+      console.error('DCA analysis failed:', e);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch baskets
         const basketsData = await api.fetchApi('/api/value/baskets');
         setBaskets(basketsData?.baskets || []);
 
-        // Fetch DCA opportunities
         const oppsData = await api.fetchApi('/api/value/opportunities');
         setOpportunities(oppsData?.opportunities || []);
 
-        // Fetch watchlist
         const watchData = await api.fetchApi('/api/value/watchlist');
         setWatchlist(watchData?.watchlist || []);
 
@@ -211,7 +519,7 @@ export function ValueTab() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 60000); // Refresh every minute
+    const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -232,6 +540,11 @@ export function ValueTab() {
         </div>
       )}
 
+      {/* DCA Analyzer */}
+      <section>
+        <DCAAnalyzer api={api} />
+      </section>
+
       {/* DCA Opportunities */}
       <section>
         <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
@@ -245,7 +558,7 @@ export function ValueTab() {
         {opportunities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {opportunities.map((opp, i) => (
-              <DCAOpportunityCard key={i} opportunity={opp} />
+              <DCAOpportunityCard key={i} opportunity={opp} onAnalyze={analyzeTicker} />
             ))}
           </div>
         ) : (
@@ -282,21 +595,29 @@ export function ValueTab() {
                   <th className="px-4 py-2 text-left text-xs text-slate-400">Ticker</th>
                   <th className="px-4 py-2 text-left text-xs text-slate-400">Tier</th>
                   <th className="px-4 py-2 text-left text-xs text-slate-400">Thesis</th>
-                  <th className="px-4 py-2 text-right text-xs text-slate-400">Max Alloc</th>
-                  <th className="px-4 py-2 text-right text-xs text-slate-400">Tranches</th>
+                  <th className="px-4 py-2 text-right text-xs text-slate-400">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {watchlist.map((item, i) => (
                   <tr key={i} className="border-t border-slate-700 hover:bg-slate-700/50">
-                    <td className="px-4 py-3 font-mono font-bold text-white">{item.ticker}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => analyzeTicker(item.ticker)}
+                        className="font-mono font-bold text-white hover:text-cyan-400"
+                      >
+                        {item.ticker}
+                      </button>
+                    </td>
                     <td className="px-4 py-3"><TierBadge tier={item.tier} /></td>
                     <td className="px-4 py-3 text-sm text-slate-400">{item.thesis}</td>
-                    <td className="px-4 py-3 text-right font-mono text-cyan-400">
-                      {(item.tranche_size * item.max_tranches * 100).toFixed(1)}%
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-300">
-                      {item.max_tranches}
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => analyzeTicker(item.ticker)}
+                        className="text-xs px-3 py-1 bg-cyan-600 hover:bg-cyan-500 rounded text-white"
+                      >
+                        Analyze DCA
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -312,7 +633,16 @@ export function ValueTab() {
 
       {/* Basket Detail Modal */}
       {selectedBasket && (
-        <BasketDetailModal basket={selectedBasket} onClose={() => setSelectedBasket(null)} />
+        <BasketDetailModal
+          basket={selectedBasket}
+          onClose={() => setSelectedBasket(null)}
+          onAnalyzeTicker={analyzeTicker}
+        />
+      )}
+
+      {/* DCA Recommendation Modal */}
+      {dcaResult && (
+        <DCARecommendationModal data={dcaResult} onClose={() => setDcaResult(null)} />
       )}
     </div>
   );
