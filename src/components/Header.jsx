@@ -26,29 +26,18 @@ function TextSizeToggle() {
   );
 }
 
+// Simplified swarm-focused tabs
 const TABS = [
-  { id: 'desk', label: 'Live Desk', icon: '📡' },
-  { id: 'bots', label: 'Bots', icon: '🤖' },
-  { id: 'spx', label: 'SPX Fleet', icon: '🎯' },
+  { id: 'live', label: 'Live', icon: '🏠' },
   { id: 'crypto', label: 'Crypto', icon: '🪙' },
-  { id: 'value', label: 'Value', icon: '💰' },
-  { id: 'themes', label: 'Themes', icon: '📈' },
-  { id: 'live', label: 'Live Monitor', icon: '📺' },
-  { id: 'trades', label: 'Trades', icon: '📈' },
-  { id: 'backtest', label: 'Backtest', icon: '🧪' },
-  { id: 'research', label: 'Research', icon: '🔬' },
-  { id: 'compare', label: 'Compare', icon: '⚖️' },
-  { id: 'rankings', label: 'Rankings', icon: '🏆' },
-  { id: 'validate', label: 'Validate', icon: '✅' },
-  { id: 'lab', label: 'Strategy Lab', icon: '📌' },
-  { id: 'ppo', label: 'PPO Lab', icon: '🧠' },
-  { id: 'postmortem', label: 'Postmortem', icon: '📊' },
+  { id: 'equity', label: 'Equity', icon: '📈' },
+  { id: 'value', label: 'Value', icon: '💎' },
+  { id: 'themes', label: 'Themes', icon: '🔍' },
 ];
 
 export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketClock, onRefresh }) {
   const api = useApi();
   const [time, setTime] = useState(new Date());
-  const [goLiveStatus, setGoLiveStatus] = useState({ bug_free_days: 0 });
   const [unrealizedPnl, setUnrealizedPnl] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -57,12 +46,9 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
     if (onRefresh) {
       await onRefresh();
     }
-    // Also refresh local data
     try {
       const data = await api.fetchApi('/api/positions/live');
       setUnrealizedPnl(data?.total_unrealized || 0);
-      const goLiveData = await api.fetchApi('/api/golive/status');
-      setGoLiveStatus(goLiveData);
     } catch (e) {
       console.error('Refresh failed:', e);
     }
@@ -89,21 +75,6 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch go-live status
-  useEffect(() => {
-    const fetchGoLive = async () => {
-      try {
-        const data = await api.fetchApi('/api/golive/status');
-        setGoLiveStatus(data);
-      } catch (e) {
-        console.error('Failed to fetch go-live status:', e);
-      }
-    };
-    fetchGoLive();
-    const interval = setInterval(fetchGoLive, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
   const etTime = time.toLocaleTimeString('en-US', {
     timeZone: 'America/New_York',
     hour: '2-digit',
@@ -113,11 +84,9 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
   });
 
   const pnl = dailyPnl?.daily_pnl || 0;
-  const pnlPct = dailyPnl?.daily_pnl_pct || 0;
   const isPositive = pnl >= 0;
 
   const status = marketClock?.status || 'CLOSED';
-  const isMarketOpen = marketClock?.is_market_open || false;
   const isTradingDay = marketClock?.is_trading_day || false;
 
   const getStatusDisplay = () => {
@@ -138,7 +107,7 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
         <div className="flex items-center justify-between mb-3">
           {/* Logo + Connection Status */}
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-white">Thaovogue</h1>
+            <h1 className="text-xl font-bold text-white">Thaovogue Swarm</h1>
             <span className={`px-2 py-1 rounded text-xs font-bold ${
               isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
             }`}>
@@ -147,7 +116,7 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
           </div>
 
           {/* Market Info */}
-          <div className="hidden md:flex items-center gap-6 text-sm">
+          <div className="hidden md:flex items-center gap-4 text-sm">
             {/* Text Size Toggle */}
             <TextSizeToggle />
 
@@ -177,34 +146,9 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
             <div className="text-slate-500">
               {isTradingDay ? 'Trading Day' : 'Weekend'}
             </div>
-
-            {/* Go-Live Mini Tracker */}
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 rounded cursor-pointer hover:bg-slate-600 transition-colors"
-              onClick={() => onTabChange('spx')}
-            >
-              <span className="text-xs text-slate-400">SPX_F:</span>
-              <div className="flex items-center gap-0.5">
-                {[...Array(14)].map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-1.5 h-3 rounded-sm ${
-                      i < goLiveStatus.bug_free_days ? 'bg-green-500' : 'bg-slate-600'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className={`font-mono text-xs font-bold ${
-                goLiveStatus.bug_free_days >= 14 ? 'text-green-400' :
-                goLiveStatus.bug_free_days >= 7 ? 'text-yellow-400' : 'text-slate-300'
-              }`}>
-                {goLiveStatus.bug_free_days}/14
-              </span>
-              {goLiveStatus.bug_free_days >= 14 && <span className="text-sm">🚀</span>}
-            </div>
           </div>
 
-          {/* Shadow P&L (Paper Trading) */}
+          {/* P&L Display */}
           <div className="text-right flex items-center gap-3">
             <div className="px-2 py-1 bg-purple-500/20 rounded">
               <span className="text-purple-400 text-xs font-medium">SHADOW </span>
@@ -238,20 +182,20 @@ export function Header({ isConnected, dailyPnl, activeTab, onTabChange, marketCl
           </span>
         </div>
 
-        {/* Tabs */}
-        <nav className="flex gap-1 -mb-px overflow-x-auto pb-1">
+        {/* Simplified Tabs */}
+        <nav className="flex gap-2 -mb-px">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
                 activeTab === tab.id
-                  ? 'bg-slate-800 text-white border-b-2 border-blue-500'
+                  ? 'bg-slate-800 text-white border-b-2 border-cyan-500'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <span>{tab.icon}</span>
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
             </button>
           ))}
         </nav>
