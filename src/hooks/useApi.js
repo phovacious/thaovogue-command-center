@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://ericsson-modems-cricket-civilization.trycloudflare.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://metals-wall-bloom-willow.trycloudflare.com';
 
 export function useApi() {
   const [loading, setLoading] = useState(false);

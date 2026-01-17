@@ -16,6 +16,9 @@ import { ResearchTab } from './components/ResearchTab';
 import { CompareTab } from './components/CompareTab';
 import { RankingsTab } from './components/RankingsTab';
 import { ValidateTab } from './components/ValidateTab';
+import { CryptoTab } from './components/CryptoTab';
+import { ValueTab } from './components/ValueTab';
+import { ThemesTab } from './components/ThemesTab';
 
 function App() {
   const [activeTab, setActiveTab] = useState('desk');
@@ -100,6 +103,18 @@ function App() {
           <SPXFleetTab />
         )}
 
+        {activeTab === 'crypto' && (
+          <CryptoTab />
+        )}
+
+        {activeTab === 'value' && (
+          <ValueTab />
+        )}
+
+        {activeTab === 'themes' && (
+          <ThemesTab />
+        )}
+
         {activeTab === 'live' && (
           <div className="px-4">
             <LiveTradingDashboard />
@@ -150,7 +165,7 @@ function App() {
 
       {/* Footer */}
       <footer className="py-4 text-center text-slate-500 text-sm">
-        <div>Thaovogue Command Center v3.9.0</div>
+        <div>Thaovogue Command Center v4.0.0</div>
         <div className="text-xs mt-1">
           {isConnected ? (
             <span className="text-green-400">Connected</span>
@@ -160,7 +175,7 @@ function App() {
           {marketClock && (
             <span className="ml-2 text-slate-600">• {marketClock.status}</span>
           )}
-          <span className="ml-2 text-slate-600">• Build: 20260108-1210</span>
+          <span className="ml-2 text-slate-600">• Build: 20260117-1100</span>
         </div>
       </footer>
     </div>

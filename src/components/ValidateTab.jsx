@@ -2,23 +2,23 @@ import { useState } from 'react';
 import { useApi } from '../hooks/useApi';
 
 const EXAMPLE_JSON = `{
-  "name": "MY_STRATEGY_V1",
+  "name": "DIP_BOUNCE_V1",
   "entry": {
-    "condition": "dip_pct >= 1.2 and rsi_5 < 25",
-    "window_start": "10:00",
+    "condition": "dip_pct >= 1.0 and rsi_5 < 30",
+    "window_start": "09:30",
     "window_end": "11:00"
   },
   "exit": {
     "target_pct": 2.0,
-    "stop_pct": null,
+    "stop_pct": 1.5,
     "eod_exit": "15:55"
   },
   "gates": {
-    "skip_days": ["Thursday", "Friday"],
+    "skip_days": ["Friday"],
     "skip_cpi": true
   },
   "capital": 50000,
-  "symbols": ["TSLA", "NVDA", "AMD"]
+  "symbols": ["TSLA", "NVDA"]
 }`;
 
 export function ValidateTab() {
