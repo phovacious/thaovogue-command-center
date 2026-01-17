@@ -1,6 +1,111 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 
+// Portfolio Bucket Display Component
+function BucketDisplay({ buckets, totalValue }) {
+  if (!buckets) return null;
+
+  const formatMoney = (val) => {
+    if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
+    if (val >= 1000) return `$${(val / 1000).toFixed(0)}K`;
+    return `$${val.toFixed(0)}`;
+  };
+
+  const BucketBar = ({ name, bucket, icon, color }) => {
+    const targetWidth = bucket.target_pct;
+    const currentWidth = Math.min(bucket.current_pct, 100);
+    const isOver = bucket.current_pct > bucket.target_pct;
+    const isUnder = bucket.current_pct < bucket.target_pct - 5;
+
+    return (
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-1">
+          <div className="flex items-center gap-2">
+            <span>{icon}</span>
+            <span className="font-bold text-white">{name}</span>
+            <span className="text-xs text-slate-400">({bucket.target_pct}% target)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`font-mono font-bold ${
+              isOver ? 'text-yellow-400' : isUnder ? 'text-orange-400' : 'text-green-400'
+            }`}>
+              {bucket.current_pct.toFixed(0)}%
+            </span>
+            <span className="text-slate-400 text-sm">{formatMoney(bucket.current_value)}</span>
+          </div>
+        </div>
+        <div className="h-4 bg-slate-700 rounded-full overflow-hidden relative">
+          {/* Target marker */}
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-white/50 z-10"
+            style={{ left: `${targetWidth}%` }}
+          />
+          {/* Current bar */}
+          <div
+            className={`h-full ${color} transition-all duration-500`}
+            style={{ width: `${currentWidth}%` }}
+          />
+        </div>
+        <div className="text-xs text-slate-500 mt-1">{bucket.job}</div>
+        {bucket.position_count !== undefined && (
+          <div className="text-xs text-slate-400 mt-0.5">
+            {bucket.position_count} positions
+            {bucket.theme_count !== undefined && ` across ${bucket.theme_count} themes`}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-white flex items-center gap-2">
+          💰 Portfolio Buckets
+        </h3>
+        <span className="text-slate-400 text-sm">
+          Total: <span className="font-mono text-white">{formatMoney(totalValue)}</span>
+        </span>
+      </div>
+
+      <BucketBar
+        name="SURVIVAL"
+        bucket={buckets.SURVIVAL}
+        icon="🛡️"
+        color="bg-green-500"
+      />
+      <BucketBar
+        name="CORE"
+        bucket={buckets.CORE}
+        icon="🏛️"
+        color="bg-blue-500"
+      />
+      <BucketBar
+        name="OPTIONALITY"
+        bucket={buckets.OPTIONALITY}
+        icon="🎲"
+        color="bg-amber-500"
+      />
+
+      {/* Rebalancing hints */}
+      {(buckets.SURVIVAL?.delta < -10 || buckets.CORE?.delta < -10 || buckets.OPTIONALITY?.delta > 5) && (
+        <div className="mt-3 p-2 bg-slate-700/50 rounded text-xs">
+          <div className="font-bold text-yellow-400 mb-1">⚖️ Rebalancing Suggestions:</div>
+          {buckets.SURVIVAL?.delta < -10 && (
+            <div className="text-slate-300">• Add {Math.abs(buckets.SURVIVAL.delta).toFixed(0)}% to SURVIVAL (dry powder)</div>
+          )}
+          {buckets.CORE?.delta < -10 && (
+            <div className="text-slate-300">• Add {Math.abs(buckets.CORE.delta).toFixed(0)}% to CORE (long-term holds)</div>
+          )}
+          {buckets.OPTIONALITY?.delta > 5 && (
+            <div className="text-slate-300">• Reduce OPTIONALITY by {buckets.OPTIONALITY.delta.toFixed(0)}% (take profits)</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Basket safety badge component
 function SafetyBadge({ rating }) {
   const config = {
@@ -480,6 +585,7 @@ export function ValueTab() {
   const [baskets, setBaskets] = useState([]);
   const [opportunities, setOpportunities] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
+  const [bucketData, setBucketData] = useState(null);
   const [selectedBasket, setSelectedBasket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -501,14 +607,18 @@ export function ValueTab() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const basketsData = await api.fetchApi('/api/value/baskets');
+        // Fetch all data in parallel
+        const [basketsData, oppsData, watchData, bucketsData] = await Promise.all([
+          api.fetchApi('/api/value/baskets'),
+          api.fetchApi('/api/value/opportunities'),
+          api.fetchApi('/api/value/watchlist'),
+          api.fetchApi('/api/value/buckets')
+        ]);
+
         setBaskets(basketsData?.baskets || []);
-
-        const oppsData = await api.fetchApi('/api/value/opportunities');
         setOpportunities(oppsData?.opportunities || []);
-
-        const watchData = await api.fetchApi('/api/value/watchlist');
         setWatchlist(watchData?.watchlist || []);
+        setBucketData(bucketsData?.status === 'ok' ? bucketsData : null);
 
         setError(null);
       } catch (e) {
@@ -538,6 +648,13 @@ export function ValueTab() {
         <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400">
           {error}
         </div>
+      )}
+
+      {/* Portfolio Buckets */}
+      {bucketData && (
+        <section>
+          <BucketDisplay buckets={bucketData.buckets} totalValue={bucketData.total_value} />
+        </section>
       )}
 
       {/* DCA Analyzer */}
