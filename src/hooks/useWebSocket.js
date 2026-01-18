@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-// Use direct WebSocket connection to VPS
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://159.65.250.246:8888/ws';
+// Use secure WebSocket connection via nginx + SSL
+const WS_URL = import.meta.env.VITE_WS_URL || 'wss://159-65-250-246.sslip.io/ws';
 
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);
