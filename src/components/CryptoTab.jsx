@@ -148,7 +148,16 @@ export function CryptoTab() {
     try {
       // Fetch status
       const statusData = await api.fetchApi('/api/crypto/status');
-      setStatus(statusData);
+      const normalizedAgents = Array.isArray(statusData?.agents)
+        ? statusData.agents.map((agent) => ({
+            ...agent,
+            name: agent.name || agent.module || 'agent',
+            running: typeof agent.running === 'boolean'
+              ? agent.running
+              : agent.status === 'running',
+          }))
+        : [];
+      setStatus({ ...statusData, agents: normalizedAgents });
 
       // Fetch recent events
       const eventsData = await api.fetchApi('/api/crypto/events?limit=20');
