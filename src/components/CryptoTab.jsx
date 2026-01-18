@@ -2,9 +2,15 @@ import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 
 // Agent Status Badge
-function AgentStatus({ name, running, cpu, mem, pid }) {
+function AgentStatus({ name, running, cpu, mem, pid, onClick }) {
   return (
-    <div className={`p-3 rounded-lg border ${running ? 'bg-slate-800 border-green-500/30' : 'bg-slate-800/50 border-red-500/30'}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`p-3 rounded-lg border text-left w-full ${
+        running ? 'bg-slate-800 border-green-500/30' : 'bg-slate-800/50 border-red-500/30'
+      }`}
+    >
       <div className="flex justify-between items-center mb-1">
         <span className="font-medium text-white">{name}</span>
         <span className={`px-2 py-0.5 rounded text-xs font-bold ${running ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
@@ -18,7 +24,7 @@ function AgentStatus({ name, running, cpu, mem, pid }) {
           <span>MEM: {mem}%</span>
         </div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -26,14 +32,21 @@ function AgentStatus({ name, running, cpu, mem, pid }) {
 function EventCard({ event }) {
   const isSignal = event.signals_found > 0;
   const isDip = event.type === 'dip_scan';
+  const isHeartbeat = event.type === 'heartbeat';
 
   return (
-    <div className={`p-3 rounded-lg border ${isSignal ? 'bg-green-500/10 border-green-500/30' : 'bg-slate-800 border-slate-700'}`}>
+    <div className={`p-3 rounded-lg border ${
+      isSignal
+        ? 'bg-green-500/10 border-green-500/30'
+        : isHeartbeat
+          ? 'bg-slate-800/50 border-slate-700/50'
+          : 'bg-slate-800 border-slate-700'
+    }`}>
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{isDip ? '📉' : '📊'}</span>
+          <span className="text-lg">{isHeartbeat ? '💓' : isDip ? '📉' : '📊'}</span>
           <span className="text-sm font-medium text-white">
-            {isDip ? 'Dip Scan' : 'Momentum Scan'}
+            {isHeartbeat ? `${event.agent || 'Agent'} Heartbeat` : isDip ? 'Dip Scan' : 'Momentum Scan'}
           </span>
         </div>
         <span className="text-xs text-slate-500">
@@ -41,7 +54,11 @@ function EventCard({ event }) {
         </span>
       </div>
 
-      {isSignal ? (
+      {isHeartbeat ? (
+        <div className="text-xs text-slate-400">
+          {event.message || 'Heartbeat OK'}
+        </div>
+      ) : isSignal ? (
         <div className="bg-green-500/20 rounded p-2 mb-2">
           <span className="text-green-400 font-bold">🚀 {event.signals_found} SIGNAL(S) FOUND!</span>
           {event.signals?.map((sig, i) => (
@@ -134,6 +151,84 @@ function PnLCard({ pnl }) {
   );
 }
 
+function AgentDetailModal({ agent, events, onClose, onRestart }) {
+  if (!agent) return null;
+
+  const agentEvents = events.filter((event) => event.agent === agent.name);
+  const lastHeartbeat = agentEvents.find((event) => event.type === 'heartbeat');
+  const recentActivity = agentEvents.filter((event) => event.type !== 'heartbeat').slice(0, 5);
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-lg max-w-xl w-full overflow-hidden">
+        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-white">{agent.name}</h2>
+            <p className="text-sm text-slate-400">{agent.module || 'crypto agent'}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">×</button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-slate-700/50 rounded p-3">
+              <div className="text-xs text-slate-400">Status</div>
+              <div className={`font-bold ${agent.running ? 'text-green-400' : 'text-red-400'}`}>
+                {agent.running ? 'RUNNING' : 'STOPPED'}
+              </div>
+            </div>
+            <div className="bg-slate-700/50 rounded p-3">
+              <div className="text-xs text-slate-400">PID</div>
+              <div className="font-mono text-white">{agent.pid || 'N/A'}</div>
+            </div>
+            <div className="bg-slate-700/50 rounded p-3">
+              <div className="text-xs text-slate-400">CPU</div>
+              <div className="font-mono text-white">{agent.cpu ? `${agent.cpu}%` : 'N/A'}</div>
+            </div>
+            <div className="bg-slate-700/50 rounded p-3">
+              <div className="text-xs text-slate-400">MEM</div>
+              <div className="font-mono text-white">{agent.mem ? `${agent.mem}%` : 'N/A'}</div>
+            </div>
+          </div>
+
+          <div className="bg-slate-700/50 rounded p-3 text-sm">
+            <div className="text-xs text-slate-400">Last Heartbeat</div>
+            <div className="text-white">
+              {lastHeartbeat
+                ? new Date(lastHeartbeat.timestamp).toLocaleString()
+                : 'No heartbeat yet'}
+            </div>
+          </div>
+
+          <div className="bg-slate-700/50 rounded p-3 text-sm">
+            <div className="text-xs text-slate-400 mb-2">Recent Activity</div>
+            {recentActivity.length > 0 ? (
+              <div className="space-y-1">
+                {recentActivity.map((event, idx) => (
+                  <div key={idx} className="text-slate-300">
+                    {new Date(event.timestamp).toLocaleTimeString()} • {event.message || event.type}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-slate-400">No recent activity.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-slate-700 flex justify-end">
+          <button
+            onClick={() => onRestart(agent)}
+            className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded hover:bg-red-500/30"
+          >
+            Restart Agent
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Main Crypto Tab Component
 export function CryptoTab() {
   const api = useApi();
@@ -143,6 +238,8 @@ export function CryptoTab() {
   const [pnl, setPnl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [eventsUpdatedAt, setEventsUpdatedAt] = useState(null);
+  const [selectedAgent, setSelectedAgent] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -169,6 +266,7 @@ export function CryptoTab() {
 
       if (eventsResult.status === 'fulfilled') {
         setEvents(eventsResult.value?.events || []);
+        setEventsUpdatedAt(new Date());
       }
 
       if (tradesResult.status === 'fulfilled') {
@@ -182,6 +280,27 @@ export function CryptoTab() {
       console.error('Failed to fetch crypto data:', e);
     }
     setLoading(false);
+  };
+
+  const refreshEvents = async () => {
+    try {
+      const eventsData = await api.fetchApi('/api/crypto/events?limit=20');
+      setEvents(eventsData?.events || []);
+      setEventsUpdatedAt(new Date());
+    } catch (e) {
+      console.error('Failed to refresh events:', e);
+    }
+  };
+
+  const handleRestartAgent = async (agent) => {
+    try {
+      await api.fetchApi('/api/crypto/restart', {
+        method: 'POST',
+        body: JSON.stringify({ name: agent.name }),
+      });
+    } catch (e) {
+      console.error('Restart failed:', e);
+    }
   };
 
   useEffect(() => {
@@ -201,6 +320,11 @@ export function CryptoTab() {
       </div>
     );
   }
+
+  const lastSignal = events.find((event) => event.signals_found > 0);
+  const hoursSinceSignal = lastSignal
+    ? Math.floor((Date.now() - new Date(lastSignal.timestamp).getTime()) / 3600000)
+    : Math.floor((Date.now() - (eventsUpdatedAt?.getTime() || Date.now())) / 3600000);
 
   return (
     <div className="px-4 space-y-6">
@@ -253,14 +377,18 @@ export function CryptoTab() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           {status?.agents?.map((agent, i) => (
-            <AgentStatus key={i} {...agent} />
+            <AgentStatus
+              key={i}
+              {...agent}
+              onClick={() => setSelectedAgent(agent)}
+            />
           )) || (
             <>
-              <AgentStatus name="Coordinator" running={false} />
-              <AgentStatus name="Scanner" running={false} />
-              <AgentStatus name="Risk Manager" running={false} />
-              <AgentStatus name="Momentum Trader" running={false} />
-              <AgentStatus name="Dip Buyer" running={false} />
+              <AgentStatus name="Coordinator" running={false} onClick={() => setSelectedAgent({ name: 'Coordinator' })} />
+              <AgentStatus name="Scanner" running={false} onClick={() => setSelectedAgent({ name: 'Scanner' })} />
+              <AgentStatus name="Risk Manager" running={false} onClick={() => setSelectedAgent({ name: 'Risk Manager' })} />
+              <AgentStatus name="Momentum Trader" running={false} onClick={() => setSelectedAgent({ name: 'Momentum Trader' })} />
+              <AgentStatus name="Dip Buyer" running={false} onClick={() => setSelectedAgent({ name: 'Dip Buyer' })} />
             </>
           )}
         </div>
@@ -327,6 +455,22 @@ export function CryptoTab() {
             <span>📡</span> Live Events
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
           </h2>
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={refreshEvents}
+              className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
+            >
+              Refresh
+            </button>
+            <span className="text-xs text-slate-500">
+              {eventsUpdatedAt ? `Updated ${eventsUpdatedAt.toLocaleTimeString()}` : 'No updates yet'}
+            </span>
+          </div>
+          {events.length === 0 && (
+            <div className="text-xs text-slate-500 mb-3">
+              No signals in last {Math.max(hoursSinceSignal, 0)} hours.
+            </div>
+          )}
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {events.length > 0 ? (
               events.map((event, i) => <EventCard key={i} event={event} />)
@@ -354,6 +498,15 @@ export function CryptoTab() {
           </div>
         </section>
       </div>
+
+      {selectedAgent && (
+        <AgentDetailModal
+          agent={selectedAgent}
+          events={events}
+          onClose={() => setSelectedAgent(null)}
+          onRestart={handleRestartAgent}
+        />
+      )}
     </div>
   );
 }
