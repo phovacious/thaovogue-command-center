@@ -218,7 +218,10 @@ export function CryptoTab() {
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span>🤖</span> Swarm Status
           </h2>
-          <span className="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-full px-2 py-1">
+          <span
+            className="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-full px-2 py-1"
+            title={status?.timestamp ? `Last update: ${new Date(status.timestamp).toLocaleString()}` : undefined}
+          >
             {status?.running ?? 0}/{status?.total ?? 0} running
           </span>
           <span
