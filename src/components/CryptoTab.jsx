@@ -157,6 +157,7 @@ function AgentDetailModal({ agent, events, onClose, onRestart }) {
   const agentEvents = events.filter((event) => event.agent === agent.name);
   const lastHeartbeat = agentEvents.find((event) => event.type === 'heartbeat');
   const recentActivity = agentEvents.filter((event) => event.type !== 'heartbeat').slice(0, 5);
+  const fallbackActivity = events.filter((event) => event.type !== 'heartbeat').slice(0, 5);
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -205,6 +206,14 @@ function AgentDetailModal({ agent, events, onClose, onRestart }) {
             {recentActivity.length > 0 ? (
               <div className="space-y-1">
                 {recentActivity.map((event, idx) => (
+                  <div key={idx} className="text-slate-300">
+                    {new Date(event.timestamp).toLocaleTimeString()} • {event.message || event.type}
+                  </div>
+                ))}
+              </div>
+            ) : fallbackActivity.length > 0 ? (
+              <div className="space-y-1">
+                {fallbackActivity.map((event, idx) => (
                   <div key={idx} className="text-slate-300">
                     {new Date(event.timestamp).toLocaleTimeString()} • {event.message || event.type}
                   </div>
@@ -325,6 +334,7 @@ export function CryptoTab() {
   const hoursSinceSignal = lastSignal
     ? Math.floor((Date.now() - new Date(lastSignal.timestamp).getTime()) / 3600000)
     : Math.floor((Date.now() - (eventsUpdatedAt?.getTime() || Date.now())) / 3600000);
+  const hasSignals = events.some((event) => event.signals_found > 0);
 
   return (
     <div className="px-4 space-y-6">
@@ -466,7 +476,7 @@ export function CryptoTab() {
               {eventsUpdatedAt ? `Updated ${eventsUpdatedAt.toLocaleTimeString()}` : 'No updates yet'}
             </span>
           </div>
-          {events.length === 0 && (
+          {!hasSignals && (
             <div className="text-xs text-slate-500 mb-3">
               No signals in last {Math.max(hoursSinceSignal, 0)} hours.
             </div>
