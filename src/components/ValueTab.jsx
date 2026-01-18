@@ -851,7 +851,7 @@ export function ValueTab() {
 
     fetchData();
     let interval;
-    if (!selectedBasket && !dcaResult) {
+    if (!selectedBasket && !dcaResult && !dcaLoading) {
       interval = setInterval(fetchData, 60000);
     }
     return () => {
