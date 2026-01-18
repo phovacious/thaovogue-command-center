@@ -10,12 +10,19 @@ export function useApi() {
     setLoading(true);
     setError(null);
 
+    const { timeoutMs = 8000, ...fetchOptions } = options;
+    const controller = fetchOptions.signal ? null : new AbortController();
+    const timeoutId = controller
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
-        ...options,
+        ...fetchOptions,
+        signal: fetchOptions.signal || controller?.signal,
         headers: {
           'Content-Type': 'application/json',
-          ...options.headers,
+          ...fetchOptions.headers,
         },
       });
 
@@ -27,9 +34,16 @@ export function useApi() {
       setLoading(false);
       return data;
     } catch (err) {
+      if (err.name === 'AbortError') {
+        setError(`Timeout after ${timeoutMs}ms`);
+        setLoading(false);
+        throw new Error(`Timeout after ${timeoutMs}ms`);
+      }
       setError(err.message);
       setLoading(false);
       throw err;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }, []);
 

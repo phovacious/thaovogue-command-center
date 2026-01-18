@@ -606,8 +606,24 @@ export function ValueTab() {
       const safeTicker = ticker?.toUpperCase();
       if (!safeTicker) return;
       const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${safeTicker}&amount=1000`);
-      if (data.status === 'ok') {
-        setDcaResult(data);
+      if (data.status === 'ok' || data.ticker) {
+        const normalized = {
+          status: 'ok',
+          tier: data.tier || 'UNKNOWN',
+          company_name: data.company_name || safeTicker,
+          current_price: data.current_price ?? 'N/A',
+          high_52w: data.high_52w ?? 'N/A',
+          distance_from_high: data.distance_from_high ?? 0,
+          hold_ok: data.hold_ok ?? false,
+          thesis: data.thesis,
+          warnings: data.warnings || [],
+          urgency: data.urgency || 'WAIT',
+          urgency_icon: data.urgency_icon || '⏳',
+          tranches: data.tranches || 0,
+          reasoning: data.reasoning || data.reason || 'Awaiting better entry',
+          ...data,
+        };
+        setDcaResult(normalized);
         setSelectedBasket(null); // Close basket modal
       }
     } catch (e) {
@@ -738,7 +754,11 @@ export function ValueTab() {
               </thead>
               <tbody>
                 {watchlist.map((item, i) => (
-                  <tr key={i} className="border-t border-slate-700 hover:bg-slate-700/50">
+                  <tr
+                    key={i}
+                    className="border-t border-slate-700 hover:bg-slate-700/50 cursor-pointer"
+                    onClick={() => analyzeTicker(item.ticker)}
+                  >
                     <td className="px-4 py-3">
                       <button
                         type="button"
