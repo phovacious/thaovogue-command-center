@@ -582,6 +582,16 @@ function DCAOpportunityCard({ opportunity, onAnalyze }) {
 // Main Value Tab Component
 export function ValueTab() {
   const api = useApi();
+  const fallbackWatchlist = [
+    { ticker: 'AAPL', tier: 'FORTRESS', thesis: 'Ecosystem lock-in + massive buybacks' },
+    { ticker: 'MSFT', tier: 'FORTRESS', thesis: 'Cloud + AI platform leader' },
+    { ticker: 'NVDA', tier: 'SOLID', thesis: 'AI compute backbone + pricing power' },
+    { ticker: 'AMZN', tier: 'SOLID', thesis: 'AWS margin engine + retail scale' },
+    { ticker: 'GOOGL', tier: 'SOLID', thesis: 'Search cashflow + AI optionality' },
+    { ticker: 'META', tier: 'SOLID', thesis: 'Ad stack recovery + efficiency gains' },
+    { ticker: 'COIN', tier: 'SPECULATIVE', thesis: 'Crypto beta with regulatory risk' },
+    { ticker: 'PLTR', tier: 'SPECULATIVE', thesis: 'Gov/enterprise AI platform momentum' },
+  ];
   const [baskets, setBaskets] = useState([]);
   const [opportunities, setOpportunities] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
@@ -593,7 +603,9 @@ export function ValueTab() {
 
   const analyzeTicker = async (ticker) => {
     try {
-      const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${ticker}&amount=1000`);
+      const safeTicker = ticker?.toUpperCase();
+      if (!safeTicker) return;
+      const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${safeTicker}&amount=1000`);
       if (data.status === 'ok') {
         setDcaResult(data);
         setSelectedBasket(null); // Close basket modal
@@ -617,7 +629,16 @@ export function ValueTab() {
 
         setBaskets(basketsData?.baskets || []);
         setOpportunities(oppsData?.opportunities || []);
-        setWatchlist(watchData?.watchlist || []);
+        const remoteWatchlist = watchData?.watchlist || [];
+        const mergedWatchlist = remoteWatchlist.length >= 5
+          ? remoteWatchlist
+          : [
+              ...remoteWatchlist,
+              ...fallbackWatchlist.filter(
+                (fallback) => !remoteWatchlist.some((item) => item.ticker === fallback.ticker)
+              ),
+            ];
+        setWatchlist(mergedWatchlist);
         setBucketData(bucketsData?.status === 'ok' ? bucketsData : null);
 
         setError(null);
@@ -720,7 +741,12 @@ export function ValueTab() {
                   <tr key={i} className="border-t border-slate-700 hover:bg-slate-700/50">
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => analyzeTicker(item.ticker)}
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          analyzeTicker(item.ticker);
+                        }}
                         className="font-mono font-bold text-white hover:text-cyan-400"
                       >
                         {item.ticker}
@@ -730,7 +756,12 @@ export function ValueTab() {
                     <td className="px-4 py-3 text-sm text-slate-400">{item.thesis}</td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => analyzeTicker(item.ticker)}
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          analyzeTicker(item.ticker);
+                        }}
                         className="text-xs px-3 py-1 bg-cyan-600 hover:bg-cyan-500 rounded text-white"
                       >
                         Analyze DCA
