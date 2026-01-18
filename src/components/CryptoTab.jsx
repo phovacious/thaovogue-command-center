@@ -146,30 +146,38 @@ export function CryptoTab() {
 
   const fetchData = async () => {
     try {
-      // Fetch status
-      const statusData = await api.fetchApi('/api/crypto/status');
-      const normalizedAgents = Array.isArray(statusData?.agents)
-        ? statusData.agents.map((agent) => ({
-            ...agent,
-            name: agent.name || agent.module || 'agent',
-            running: typeof agent.running === 'boolean'
-              ? agent.running
-              : agent.status === 'running',
-          }))
-        : [];
-      setStatus({ ...statusData, agents: normalizedAgents });
+      const [statusResult, eventsResult, tradesResult, pnlResult] = await Promise.allSettled([
+        api.fetchApi('/api/crypto/status'),
+        api.fetchApi('/api/crypto/events?limit=20'),
+        api.fetchApi('/api/crypto/trades?limit=10'),
+        api.fetchApi('/api/crypto/pnl'),
+      ]);
 
-      // Fetch recent events
-      const eventsData = await api.fetchApi('/api/crypto/events?limit=20');
-      setEvents(eventsData?.events || []);
+      if (statusResult.status === 'fulfilled') {
+        const statusData = statusResult.value;
+        const normalizedAgents = Array.isArray(statusData?.agents)
+          ? statusData.agents.map((agent) => ({
+              ...agent,
+              name: agent.name || agent.module || 'agent',
+              running: typeof agent.running === 'boolean'
+                ? agent.running
+                : agent.status === 'running',
+            }))
+          : [];
+        setStatus({ ...statusData, agents: normalizedAgents });
+      }
 
-      // Fetch trades
-      const tradesData = await api.fetchApi('/api/crypto/trades?limit=10');
-      setTrades(tradesData?.trades || []);
+      if (eventsResult.status === 'fulfilled') {
+        setEvents(eventsResult.value?.events || []);
+      }
 
-      // Fetch P&L
-      const pnlData = await api.fetchApi('/api/crypto/pnl');
-      setPnl(pnlData);
+      if (tradesResult.status === 'fulfilled') {
+        setTrades(tradesResult.value?.trades || []);
+      }
+
+      if (pnlResult.status === 'fulfilled') {
+        setPnl(pnlResult.value);
+      }
     } catch (e) {
       console.error('Failed to fetch crypto data:', e);
     }

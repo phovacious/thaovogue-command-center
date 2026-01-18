@@ -647,28 +647,41 @@ export function ValueTab() {
       setLoading(true);
       try {
         // Fetch all data in parallel
-        const [basketsData, oppsData, watchData, bucketsData] = await Promise.all([
+        const [basketsResult, oppsResult, watchResult, bucketsResult] = await Promise.allSettled([
           api.fetchApi('/api/value/baskets'),
           api.fetchApi('/api/value/opportunities'),
           api.fetchApi('/api/value/watchlist'),
           api.fetchApi('/api/value/buckets')
         ]);
 
-        setBaskets(basketsData?.baskets || []);
-        setOpportunities(oppsData?.opportunities || []);
-        const remoteWatchlist = watchData?.watchlist || [];
-        const mergedWatchlist = remoteWatchlist.length >= 5
-          ? remoteWatchlist
-          : [
-              ...remoteWatchlist,
-              ...fallbackWatchlist.filter(
-                (fallback) => !remoteWatchlist.some((item) => item.ticker === fallback.ticker)
-              ),
-            ];
-        setWatchlist(mergedWatchlist);
-        setBucketData(bucketsData?.status === 'ok' ? bucketsData : null);
+        const anySuccess = [basketsResult, oppsResult, watchResult, bucketsResult]
+          .some((result) => result.status === 'fulfilled');
 
-        setError(null);
+        if (basketsResult.status === 'fulfilled') {
+          setBaskets(basketsResult.value?.baskets || []);
+        }
+        if (oppsResult.status === 'fulfilled') {
+          setOpportunities(oppsResult.value?.opportunities || []);
+        }
+        if (watchResult.status === 'fulfilled') {
+          const remoteWatchlist = watchResult.value?.watchlist || [];
+          const mergedWatchlist = remoteWatchlist.length >= 5
+            ? remoteWatchlist
+            : [
+                ...remoteWatchlist,
+                ...fallbackWatchlist.filter(
+                  (fallback) => !remoteWatchlist.some((item) => item.ticker === fallback.ticker)
+                ),
+              ];
+          setWatchlist(mergedWatchlist);
+        } else {
+          setWatchlist(fallbackWatchlist);
+        }
+        if (bucketsResult.status === 'fulfilled') {
+          setBucketData(bucketsResult.value?.status === 'ok' ? bucketsResult.value : null);
+        }
+
+        setError(anySuccess ? null : 'Failed to load data. API may be offline.');
       } catch (e) {
         console.error('Failed to fetch value data:', e);
         setError('Failed to load data. API may be offline.');
