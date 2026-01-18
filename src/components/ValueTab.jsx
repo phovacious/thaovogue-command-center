@@ -162,6 +162,7 @@ function DCARecommendationModal({ data, onClose }) {
 
   const isRisky = data.tier === 'SPECULATIVE' || data.tier === 'AVOID' || data.tier === 'UNKNOWN';
   const schedule = Array.isArray(data.schedule) ? data.schedule : [];
+  const isLoading = data.status === 'loading';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -180,6 +181,12 @@ function DCARecommendationModal({ data, onClose }) {
         </div>
 
         <div className="p-4 overflow-y-auto max-h-[65vh] space-y-4">
+          {isLoading && (
+            <div className="bg-slate-700/50 rounded-lg p-4 text-sm text-slate-300 flex items-center gap-2">
+              <span className="animate-spin">⏳</span>
+              Fetching DCA recommendation...
+            </div>
+          )}
           {/* Price Info */}
           <div className="grid grid-cols-3 gap-4 bg-slate-700/50 rounded-lg p-4">
             <div className="text-center">
@@ -627,11 +634,31 @@ export function ValueTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dcaResult, setDcaResult] = useState(null);
+  const [dcaLoading, setDcaLoading] = useState(false);
 
   const analyzeTicker = async (ticker) => {
     try {
       const safeTicker = ticker?.toUpperCase();
       if (!safeTicker) return;
+      if (dcaLoading && dcaResult?.ticker === safeTicker) return;
+      setDcaLoading(true);
+      setDcaResult({
+        status: 'loading',
+        ticker: safeTicker,
+        tier: 'UNKNOWN',
+        company_name: safeTicker,
+        current_price: 'N/A',
+        high_52w: 'N/A',
+        distance_from_high: 0,
+        hold_ok: false,
+        urgency: 'WAIT',
+        urgency_icon: '⏳',
+        tranches: 0,
+        reasoning: 'Fetching recommendation...',
+        amount: 1000,
+        schedule: [],
+        warnings: [],
+      });
       const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${safeTicker}&amount=1000`);
       if (data.status === 'ok' || data.ticker) {
         setDcaResult(normalizeDcaResult(data, safeTicker, 1000));
@@ -639,6 +666,8 @@ export function ValueTab() {
       }
     } catch (e) {
       console.error('DCA analysis failed:', e);
+    } finally {
+      setDcaLoading(false);
     }
   };
 
