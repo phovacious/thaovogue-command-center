@@ -769,9 +769,14 @@ export function ValueTab() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    let interval;
+    if (!selectedBasket && !dcaResult) {
+      interval = setInterval(fetchData, 60000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [selectedBasket, dcaResult]);
 
   if (loading) {
     return (
