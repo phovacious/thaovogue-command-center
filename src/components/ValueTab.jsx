@@ -240,11 +240,29 @@ function DCARecommendationModal({ data, onClose }) {
             </div>
           </div>
 
-          {/* Thesis */}
-          {data.thesis && (
+            {/* Thesis */}
+            {data.thesis && (
+              <div className="bg-slate-700/30 rounded-lg p-3">
+                <div className="text-xs text-slate-400 mb-1">Investment Thesis</div>
+                <div className="text-sm text-white">{data.thesis}</div>
+              </div>
+            )}
+
+          {(data.company_name || data.sector || data.market_cap || data.description) && (
             <div className="bg-slate-700/30 rounded-lg p-3">
-              <div className="text-xs text-slate-400 mb-1">Investment Thesis</div>
-              <div className="text-sm text-white">{data.thesis}</div>
+              <div className="text-xs text-slate-400 mb-2">Company Info</div>
+              {data.company_name && (
+                <div className="text-sm text-white font-semibold">{data.company_name}</div>
+              )}
+              <div className="text-xs text-slate-400">
+                {data.sector && <span>Sector: {data.sector}</span>}
+                {data.market_cap && (
+                  <span className="ml-2">Market Cap: ${(data.market_cap / 1e9).toFixed(1)}B</span>
+                )}
+              </div>
+              {data.description && (
+                <div className="text-sm text-slate-300 mt-2">{data.description}</div>
+              )}
             </div>
           )}
 
@@ -463,6 +481,9 @@ function normalizeDcaResult(data, fallbackTicker, fallbackAmount) {
     ticker: data.ticker || fallbackTicker,
     tier: data.tier || 'UNKNOWN',
     company_name: data.company_name || fallbackTicker,
+    sector: data.sector,
+    market_cap: data.market_cap,
+    description: data.description,
     current_price: data.current_price ?? data.target_entry ?? 'N/A',
     high_52w: data.high_52w ?? 'N/A',
     distance_from_high: data.distance_from_high ?? normalizedDrawdown,
