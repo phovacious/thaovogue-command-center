@@ -262,6 +262,7 @@ export function CryptoTab() {
   const [events, setEvents] = useState([]);
   const [trades, setTrades] = useState([]);
   const [pnl, setPnl] = useState(null);
+  const [dcaWatchlist, setDcaWatchlist] = useState({ tokens: {}, labels: {}, blacklist: [] });
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [eventsUpdatedAt, setEventsUpdatedAt] = useState(null);
@@ -269,11 +270,12 @@ export function CryptoTab() {
 
   const fetchData = async () => {
     try {
-      const [statusResult, eventsResult, tradesResult, pnlResult] = await Promise.allSettled([
+      const [statusResult, eventsResult, tradesResult, pnlResult, dcaResult] = await Promise.allSettled([
         api.fetchApi('/api/crypto/status'),
         api.fetchApi('/api/crypto/events?limit=20'),
         api.fetchApi('/api/crypto/trades?limit=10'),
         api.fetchApi('/api/crypto/pnl'),
+        api.fetchApi('/api/crypto/dca-watchlist'),
       ]);
 
       if (statusResult.status === 'fulfilled') {
@@ -301,6 +303,10 @@ export function CryptoTab() {
 
       if (pnlResult.status === 'fulfilled') {
         setPnl(pnlResult.value);
+      }
+
+      if (dcaResult.status === 'fulfilled') {
+        setDcaWatchlist(dcaResult.value || { tokens: {}, labels: {}, blacklist: [] });
       }
     } catch (e) {
       console.error('Failed to fetch crypto data:', e);
@@ -352,6 +358,17 @@ export function CryptoTab() {
     ? Math.floor((Date.now() - new Date(lastSignal.timestamp).getTime()) / 3600000)
     : Math.floor((Date.now() - (eventsUpdatedAt?.getTime() || Date.now())) / 3600000);
   const hasSignals = events.some((event) => event.signals_found > 0);
+
+  const labelStyles = {
+    HOLD_FOREVER: 'bg-green-500/20 text-green-300 border-green-500/30',
+    HOLD_1YEAR: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    SWING_TRADE: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+    DAY_TRADE: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+    AVOID: 'bg-red-500/20 text-red-300 border-red-500/30',
+  };
+
+  const tokens = Object.entries(dcaWatchlist?.tokens || {});
+  const blacklist = dcaWatchlist?.blacklist || [];
 
   return (
     <div className="px-4 space-y-6">
@@ -473,6 +490,73 @@ export function CryptoTab() {
           </div>
         </div>
       </div>
+
+      {/* DCA Watchlist */}
+      <section className="bg-slate-800 rounded-lg border border-slate-700 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>🧭</span> DCA Watchlist
+            </h2>
+            <p className="text-xs text-slate-400">
+              Labels drive behavior; drawdown uses local cache (no external pricing).
+            </p>
+          </div>
+          {blacklist.length > 0 && (
+            <div className="text-xs text-slate-400">
+              Blacklist: <span className="text-red-400">{blacklist.join(', ')}</span>
+            </div>
+          )}
+        </div>
+        {tokens.length === 0 ? (
+          <div className="text-slate-400 text-sm">No DCA tokens configured.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {tokens.map(([symbol, token]) => {
+              const label = token.label || 'UNKNOWN';
+              const badgeClass = labelStyles[label] || 'bg-slate-700 text-slate-200 border-slate-600';
+              const drawdown = token.drawdown_pct;
+              const drawdownDisplay =
+                typeof drawdown === 'number' ? `${drawdown.toFixed(2)}%` : 'n/a';
+              return (
+                <div key={symbol} className="border border-slate-700 rounded-lg p-3 bg-slate-900/40">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-lg font-bold text-white">{symbol}</div>
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${badgeClass}`}>
+                      {label}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-300 mb-2">{token.thesis}</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                    <div>
+                      DCA trigger
+                      <div className="text-white font-mono">
+                        {(token.dca_trigger * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                    <div>
+                      Take profit
+                      <div className="text-white font-mono">
+                        {token.take_profit ? `${token.take_profit}x` : '—'}
+                      </div>
+                    </div>
+                    <div>
+                      Drawdown
+                      <div className="text-white font-mono">{drawdownDisplay}</div>
+                    </div>
+                    <div>
+                      Price
+                      <div className="text-white font-mono">
+                        {token.price ? `$${Number(token.price).toFixed(2)}` : 'n/a'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Recent Events and Trades */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
