@@ -531,8 +531,29 @@ function BasketCard({ basket, onSelect }) {
 }
 
 // Basket Detail Modal with DCA for each holding
-function BasketDetailModal({ basket, onClose, onAnalyzeTicker }) {
+function BasketDetailModal({ basket, onClose, onAnalyzeTicker, onPreviewTicker, previewByTicker }) {
   if (!basket) return null;
+
+  const renderPreview = (ticker) => {
+    const preview = previewByTicker?.[ticker];
+    if (!preview) return null;
+    const parts = [];
+    if (preview.company_name) parts.push(preview.company_name);
+    if (preview.sector) parts.push(preview.sector);
+    if (preview.market_cap) {
+      parts.push(`$${(preview.market_cap / 1e9).toFixed(1)}B`);
+    }
+    return (
+      <div className="text-xs text-slate-400 mt-1">
+        {parts.join(' • ')}
+        {preview.description && (
+          <div className="text-slate-500 mt-1">
+            {preview.description.slice(0, 120)}{preview.description.length > 120 ? '…' : ''}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -554,7 +575,11 @@ function BasketDetailModal({ basket, onClose, onAnalyzeTicker }) {
               </h3>
               <div className="space-y-2">
                 {basket.safe_holdings.map((h, i) => (
-                  <div key={i} className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <div
+                    key={i}
+                    className="flex items-center justify-between bg-slate-700/50 p-2 rounded"
+                    onMouseEnter={() => onPreviewTicker(h.ticker)}
+                  >
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => onAnalyzeTicker(h.ticker)}
@@ -563,6 +588,7 @@ function BasketDetailModal({ basket, onClose, onAnalyzeTicker }) {
                         {h.ticker}
                       </button>
                       <TierBadge tier={h.tier} />
+                      <div className="hidden md:block">{renderPreview(h.ticker)}</div>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-cyan-400 font-mono">{(h.weight * 100).toFixed(0)}%</span>
@@ -587,7 +613,11 @@ function BasketDetailModal({ basket, onClose, onAnalyzeTicker }) {
               </h3>
               <div className="space-y-2">
                 {basket.risky_holdings.map((h, i) => (
-                  <div key={i} className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <div
+                    key={i}
+                    className="flex items-center justify-between bg-slate-700/50 p-2 rounded"
+                    onMouseEnter={() => onPreviewTicker(h.ticker)}
+                  >
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => onAnalyzeTicker(h.ticker)}
@@ -596,6 +626,7 @@ function BasketDetailModal({ basket, onClose, onAnalyzeTicker }) {
                         {h.ticker}
                       </button>
                       <TierBadge tier={h.tier} />
+                      <div className="hidden md:block">{renderPreview(h.ticker)}</div>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-orange-400 font-mono">{(h.weight * 100).toFixed(0)}%</span>
@@ -620,10 +651,15 @@ function BasketDetailModal({ basket, onClose, onAnalyzeTicker }) {
               </h3>
               <div className="space-y-2">
                 {basket.excluded.map((h, i) => (
-                  <div key={i} className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <div
+                    key={i}
+                    className="flex items-center justify-between bg-slate-700/50 p-2 rounded"
+                    onMouseEnter={() => onPreviewTicker(h.ticker)}
+                  >
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-slate-400">{h.ticker}</span>
                       <span className="text-xs text-red-400">{h.reason}</span>
+                      <div className="hidden md:block">{renderPreview(h.ticker)}</div>
                     </div>
                     <span className="text-slate-500 font-mono">{(h.weight * 100).toFixed(0)}%</span>
                   </div>
@@ -691,6 +727,8 @@ export function ValueTab() {
   const [error, setError] = useState(null);
   const [dcaResult, setDcaResult] = useState(null);
   const [dcaLoading, setDcaLoading] = useState(false);
+  const [previewByTicker, setPreviewByTicker] = useState({});
+  const [previewLoading, setPreviewLoading] = useState({});
 
   const analyzeTicker = async (ticker) => {
     try {
@@ -724,6 +762,28 @@ export function ValueTab() {
       console.error('DCA analysis failed:', e);
     } finally {
       setDcaLoading(false);
+    }
+  };
+
+  const prefetchPreview = async (ticker) => {
+    const safeTicker = ticker?.toUpperCase();
+    if (!safeTicker) return;
+    if (previewByTicker[safeTicker] || previewLoading[safeTicker]) return;
+    setPreviewLoading((prev) => ({ ...prev, [safeTicker]: true }));
+    try {
+      const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${safeTicker}&amount=1000`, {
+        timeoutMs: 6000,
+      });
+      if (data.status === 'ok' || data.ticker) {
+        setPreviewByTicker((prev) => ({
+          ...prev,
+          [safeTicker]: normalizeDcaResult(data, safeTicker, 1000),
+        }));
+      }
+    } catch (e) {
+      // Silent: preview is optional
+    } finally {
+      setPreviewLoading((prev) => ({ ...prev, [safeTicker]: false }));
     }
   };
 
@@ -947,6 +1007,8 @@ export function ValueTab() {
           basket={selectedBasket}
           onClose={() => setSelectedBasket(null)}
           onAnalyzeTicker={analyzeTicker}
+          onPreviewTicker={prefetchPreview}
+          previewByTicker={previewByTicker}
         />
       )}
 
