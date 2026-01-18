@@ -161,6 +161,7 @@ function DCARecommendationModal({ data, onClose }) {
   if (!data) return null;
 
   const isRisky = data.tier === 'SPECULATIVE' || data.tier === 'AVOID' || data.tier === 'UNKNOWN';
+  const schedule = Array.isArray(data.schedule) ? data.schedule : [];
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -241,30 +242,34 @@ function DCARecommendationModal({ data, onClose }) {
             {/* Schedule */}
             <div className="mt-4">
               <div className="text-xs text-slate-400 mb-2">
-                Schedule for ${data.amount.toLocaleString()}:
+                Schedule for ${Number(data.amount || 0).toLocaleString()}:
               </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {data.schedule.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="w-16 text-xs text-slate-500">Week {s.week}</div>
-                    <div className="flex-1 h-6 bg-slate-600 rounded-full overflow-hidden relative">
-                      <div
-                        className={`h-full ${
-                          i === 0 && data.urgency === 'HIGH' ? 'bg-red-500' :
-                          i === 0 ? 'bg-cyan-500' : 'bg-cyan-600/70'
-                        }`}
-                        style={{ width: `${s.pct * 2}%` }}
-                      />
-                      <span className="absolute inset-0 flex items-center justify-center text-xs text-white font-mono">
-                        ${s.amount} ({s.pct}%)
-                      </span>
+              {schedule.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {schedule.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="w-16 text-xs text-slate-500">Week {s.week}</div>
+                      <div className="flex-1 h-6 bg-slate-600 rounded-full overflow-hidden relative">
+                        <div
+                          className={`h-full ${
+                            i === 0 && data.urgency === 'HIGH' ? 'bg-red-500' :
+                            i === 0 ? 'bg-cyan-500' : 'bg-cyan-600/70'
+                          }`}
+                          style={{ width: `${s.pct * 2}%` }}
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center text-xs text-white font-mono">
+                          ${s.amount} ({s.pct}%)
+                        </span>
+                      </div>
+                      <div className="w-20 text-xs text-slate-400 text-right">
+                        ~{s.shares} shares
+                      </div>
                     </div>
-                    <div className="w-20 text-xs text-slate-400 text-right">
-                      ~{s.shares} shares
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-slate-500">No schedule available.</div>
+              )}
             </div>
           </div>
 
@@ -353,8 +358,8 @@ function DCAAnalyzer({ api }) {
     setError(null);
     try {
       const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${ticker.toUpperCase()}&amount=${amount}`);
-      if (data.status === 'ok') {
-        setResult(data);
+      if (data.status === 'ok' || data.ticker) {
+        setResult(normalizeDcaResult(data, ticker.toUpperCase(), amount));
       } else {
         setError(data.message || 'Failed to analyze');
       }
@@ -408,6 +413,28 @@ function DCAAnalyzer({ api }) {
       )}
     </>
   );
+}
+
+function normalizeDcaResult(data, fallbackTicker, fallbackAmount) {
+  return {
+    status: data.status || 'ok',
+    ticker: data.ticker || fallbackTicker,
+    tier: data.tier || 'UNKNOWN',
+    company_name: data.company_name || fallbackTicker,
+    current_price: data.current_price ?? 'N/A',
+    high_52w: data.high_52w ?? 'N/A',
+    distance_from_high: data.distance_from_high ?? 0,
+    hold_ok: data.hold_ok ?? false,
+    thesis: data.thesis,
+    warnings: data.warnings || [],
+    urgency: data.urgency || 'WAIT',
+    urgency_icon: data.urgency_icon || '⏳',
+    tranches: data.tranches || 0,
+    reasoning: data.reasoning || data.reason || 'Awaiting better entry',
+    amount: data.amount || fallbackAmount || 1000,
+    schedule: Array.isArray(data.schedule) ? data.schedule : [],
+    fundamentals: data.fundamentals,
+  };
 }
 
 // Basket Card Component
@@ -607,23 +634,7 @@ export function ValueTab() {
       if (!safeTicker) return;
       const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${safeTicker}&amount=1000`);
       if (data.status === 'ok' || data.ticker) {
-        const normalized = {
-          status: 'ok',
-          tier: data.tier || 'UNKNOWN',
-          company_name: data.company_name || safeTicker,
-          current_price: data.current_price ?? 'N/A',
-          high_52w: data.high_52w ?? 'N/A',
-          distance_from_high: data.distance_from_high ?? 0,
-          hold_ok: data.hold_ok ?? false,
-          thesis: data.thesis,
-          warnings: data.warnings || [],
-          urgency: data.urgency || 'WAIT',
-          urgency_icon: data.urgency_icon || '⏳',
-          tranches: data.tranches || 0,
-          reasoning: data.reasoning || data.reason || 'Awaiting better entry',
-          ...data,
-        };
-        setDcaResult(normalized);
+        setDcaResult(normalizeDcaResult(data, safeTicker, 1000));
         setSelectedBasket(null); // Close basket modal
       }
     } catch (e) {
