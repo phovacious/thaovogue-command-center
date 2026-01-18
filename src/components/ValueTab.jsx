@@ -789,7 +789,10 @@ export function ValueTab() {
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      const isInitial = watchlist.length === 0 && baskets.length === 0 && opportunities.length === 0;
+      if (isInitial) {
+        setLoading(true);
+      }
       try {
         // Fetch all data in parallel
         const [basketsResult, oppsResult, watchResult, bucketsResult] = await Promise.allSettled([
@@ -846,7 +849,9 @@ export function ValueTab() {
         console.error('Failed to fetch value data:', e);
         setError('Failed to load data. API may be offline.');
       }
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     };
 
     if (!selectedBasket && !dcaResult && !dcaLoading) {
