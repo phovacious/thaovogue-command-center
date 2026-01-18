@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 
+const AGENT_DESCRIPTIONS = {
+  // Crypto
+  coordinator: 'Orchestrates all crypto agents, manages state and prevents conflicts',
+  scanner: 'Scans for volume spikes and momentum signals across all tokens',
+  risk: 'Monitors position sizes, drawdowns, and enforces risk limits',
+  agent_v2: 'Executes two-stage accumulation strategy (spike → breakout)',
+  dip_buyer: 'Buys dips on high-conviction tokens when RSI oversold',
+  // Equity
+  equity_alpha: 'Morning momentum scanner - finds opening range breakouts',
+  spx_canary: 'Conservative SPX options - tests market conditions first',
+  ultra_printer: 'TSLA autonomous agent - dip buying and support bounces',
+};
+
 // Agent Status Badge
 function AgentStatus({ name, running, cpu, mem, pid, onClick }) {
   return (
@@ -158,6 +171,7 @@ function AgentDetailModal({ agent, events, onClose, onRestart }) {
   const lastHeartbeat = agentEvents.find((event) => event.type === 'heartbeat');
   const recentActivity = agentEvents.filter((event) => event.type !== 'heartbeat').slice(0, 5);
   const fallbackActivity = events.filter((event) => event.type !== 'heartbeat').slice(0, 5);
+  const description = AGENT_DESCRIPTIONS[agent.name] || AGENT_DESCRIPTIONS[agent.module] || 'Agent description pending.';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -171,6 +185,9 @@ function AgentDetailModal({ agent, events, onClose, onRestart }) {
         </div>
 
         <div className="p-4 space-y-4">
+          <div className="bg-slate-700/40 rounded p-3 text-sm text-slate-200 border border-slate-600">
+            {description}
+          </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="bg-slate-700/50 rounded p-3">
               <div className="text-xs text-slate-400">Status</div>
