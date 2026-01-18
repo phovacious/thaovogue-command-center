@@ -1,6 +1,83 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 
+const EQUITY_DESCRIPTIONS = {
+  equity_alpha: 'Morning momentum scanner - opening range breakouts',
+  equity_beta: 'Momentum continuation - rides winners',
+  equity_gamma: 'Mean reversion - oversold bounces',
+  spx_canary: 'Conservative SPX options - tests conditions',
+  spx_beta: '35pt aggressive SPX credit spreads',
+  spx_charlie: '40pt SPX spreads - high conviction',
+  ultra_printer: 'TSLA autonomous - dip buying + support',
+  bot_spx_recycler: 'Recycles capital through SPX trades',
+};
+
+const EQUITY_AGENTS = [
+  { key: 'equity_alpha', name: 'Equity Alpha' },
+  { key: 'equity_beta', name: 'Equity Beta' },
+  { key: 'equity_gamma', name: 'Equity Gamma' },
+  { key: 'spx_canary', name: 'SPX Canary' },
+  { key: 'spx_beta', name: 'SPX Beta' },
+  { key: 'spx_charlie', name: 'SPX Charlie' },
+  { key: 'ultra_printer', name: 'Ultra Printer' },
+  { key: 'bot_spx_recycler', name: 'SPX Recycler' },
+];
+
+function AgentCard({ agent, running, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`p-3 rounded-lg border text-left w-full transition-colors cursor-pointer ${
+        running ? 'bg-slate-800 border-green-500/30' : 'bg-slate-800/50 border-slate-600'
+      } hover:border-cyan-500/60`}
+    >
+      <div className="flex justify-between items-center mb-1">
+        <span className="font-medium text-white">{agent.name}</span>
+        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+          running ? 'bg-green-500/20 text-green-400' : 'bg-slate-600/20 text-slate-300'
+        }`}>
+          {running ? 'RUNNING' : 'UNKNOWN'}
+        </span>
+      </div>
+      <div className="text-xs text-slate-400">
+        {EQUITY_DESCRIPTIONS[agent.key] || 'Agent description pending.'}
+      </div>
+    </button>
+  );
+}
+
+function EquityAgentModal({ agent, running, onClose }) {
+  if (!agent) return null;
+  const description = EQUITY_DESCRIPTIONS[agent.key] || 'Agent description pending.';
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-lg max-w-xl w-full overflow-hidden">
+        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-white">{agent.name}</h2>
+            <p className="text-sm text-slate-400">{agent.key}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">×</button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="bg-slate-700/40 rounded p-3 text-sm text-slate-200 border border-slate-600">
+            {description}
+          </div>
+          <div className="bg-slate-700/50 rounded p-3 text-sm">
+            <div className="text-xs text-slate-400">Status</div>
+            <div className={`font-bold ${running ? 'text-green-400' : 'text-slate-300'}`}>
+              {running ? 'RUNNING' : 'UNKNOWN'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MorningMomentumCard({ data, onScan }) {
   const [scanning, setScanning] = useState(false);
 
@@ -273,6 +350,7 @@ export function EquityTab() {
   const api = useApi();
   const [mmStatus, setMmStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedAgent, setSelectedAgent] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -325,6 +403,23 @@ export function EquityTab() {
       {/* Morning Momentum Card */}
       <MorningMomentumCard data={mmStatus} onScan={handleScan} />
 
+      {/* Agent Grid */}
+      <section>
+        <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+          <span>🤖</span> Equity Agents
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {EQUITY_AGENTS.map((agent) => (
+            <AgentCard
+              key={agent.key}
+              agent={agent}
+              running={agent.key === 'equity_alpha' && mmStatus?.status === 'ok'}
+              onClick={() => setSelectedAgent(agent)}
+            />
+          ))}
+        </div>
+      </section>
+
       {/* Grid: Strategy Params + Backtest Results */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <StrategyParamsCard params={mmStatus?.parameters} />
@@ -359,6 +454,14 @@ export function EquityTab() {
           </div>
         </div>
       </div>
+
+      {selectedAgent && (
+        <EquityAgentModal
+          agent={selectedAgent}
+          running={selectedAgent.key === 'equity_alpha' && mmStatus?.status === 'ok'}
+          onClose={() => setSelectedAgent(null)}
+        />
+      )}
     </div>
   );
 }
