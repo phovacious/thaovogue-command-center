@@ -218,23 +218,30 @@ export function CryptoTab() {
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span>🤖</span> Swarm Status
           </h2>
-          <span
-            className="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-full px-2 py-1"
-            title={status?.timestamp ? `Last update: ${new Date(status.timestamp).toLocaleString()}` : undefined}
-          >
-            {status?.running ?? 0}/{status?.total ?? 0} running
-          </span>
-          <span
-            className={`text-xs font-semibold rounded-full px-2 py-1 ${
-              status?.status === 'healthy'
-                ? 'bg-green-500/20 text-green-400'
-                : status?.status === 'degraded'
-                  ? 'bg-yellow-500/20 text-yellow-400'
-                  : 'bg-red-500/20 text-red-400'
-            }`}
-          >
-            {(status?.status || 'offline').toUpperCase()}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-full px-2 py-1"
+              title={status?.timestamp ? `Last update: ${new Date(status.timestamp).toLocaleString()}` : undefined}
+            >
+              {status?.running ?? 0}/{status?.total ?? 0} running
+            </span>
+            <span
+              className={`text-xs font-semibold rounded-full px-2 py-1 ${
+                status?.status === 'healthy'
+                  ? 'bg-green-500/20 text-green-400'
+                  : status?.status === 'degraded'
+                    ? 'bg-yellow-500/20 text-yellow-400'
+                    : 'bg-red-500/20 text-red-400'
+              }`}
+            >
+              {(status?.status || 'offline').toUpperCase()}
+            </span>
+            {status?.timestamp && (
+              <span className="text-xs text-slate-500">
+                updated {new Date(status.timestamp).toLocaleTimeString()}
+              </span>
+            )}
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           {status?.agents?.map((agent, i) => (
