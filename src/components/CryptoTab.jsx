@@ -214,9 +214,14 @@ export function CryptoTab() {
 
       {/* Agent Status Grid */}
       <section>
-        <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-          <span>🤖</span> Swarm Status
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <span>🤖</span> Swarm Status
+          </h2>
+          <span className="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-full px-2 py-1">
+            {status?.running ?? 0}/{status?.total ?? 0} running
+          </span>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           {status?.agents?.map((agent, i) => (
             <AgentStatus key={i} {...agent} />
