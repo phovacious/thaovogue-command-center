@@ -7,9 +7,9 @@ function AgentStatus({ name, running, cpu, mem, pid, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`p-3 rounded-lg border text-left w-full ${
+      className={`p-3 rounded-lg border text-left w-full transition-colors cursor-pointer ${
         running ? 'bg-slate-800 border-green-500/30' : 'bg-slate-800/50 border-red-500/30'
-      }`}
+      } hover:border-cyan-500/60`}
     >
       <div className="flex justify-between items-center mb-1">
         <span className="font-medium text-white">{name}</span>

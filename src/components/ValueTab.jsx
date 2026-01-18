@@ -106,6 +106,37 @@ function BucketDisplay({ buckets, totalValue }) {
   );
 }
 
+function LegacyBucketDisplay({ buckets, totalAllocation, totalDeployed }) {
+  if (!buckets || buckets.length === 0) return null;
+  return (
+    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-white flex items-center gap-2">
+          💰 DCA Buckets
+        </h3>
+        <span className="text-slate-400 text-sm">
+          Deployed: <span className="font-mono text-white">{totalDeployed ?? 0}%</span> / {totalAllocation ?? 100}%
+        </span>
+      </div>
+      <div className="space-y-3">
+        {buckets.map((bucket, idx) => (
+          <div key={idx} className="bg-slate-700/50 rounded p-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="font-semibold text-white">{bucket.name}</span>
+              <span className="text-xs text-slate-400">
+                {bucket.deployed ?? 0}% / {bucket.allocation ?? 0}%
+              </span>
+            </div>
+            <div className="text-xs text-slate-500">
+              {bucket.tickers?.length ? bucket.tickers.join(', ') : 'No tickers'}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Basket safety badge component
 function SafetyBadge({ rating }) {
   const config = {
@@ -423,14 +454,18 @@ function DCAAnalyzer({ api }) {
 }
 
 function normalizeDcaResult(data, fallbackTicker, fallbackAmount) {
+  const fallbackDrawdown = data.current_drawdown;
+  const normalizedDrawdown = typeof fallbackDrawdown === 'number'
+    ? Math.abs(fallbackDrawdown)
+    : 0;
   return {
     status: data.status || 'ok',
     ticker: data.ticker || fallbackTicker,
     tier: data.tier || 'UNKNOWN',
     company_name: data.company_name || fallbackTicker,
-    current_price: data.current_price ?? 'N/A',
+    current_price: data.current_price ?? data.target_entry ?? 'N/A',
     high_52w: data.high_52w ?? 'N/A',
-    distance_from_high: data.distance_from_high ?? 0,
+    distance_from_high: data.distance_from_high ?? normalizedDrawdown,
     hold_ok: data.hold_ok ?? false,
     thesis: data.thesis,
     warnings: data.warnings || [],
@@ -693,7 +728,11 @@ export function ValueTab() {
           setOpportunities(oppsResult.value?.opportunities || []);
         }
         if (watchResult.status === 'fulfilled') {
-          const remoteWatchlist = watchResult.value?.watchlist || [];
+          const remoteWatchlist = (watchResult.value?.watchlist || []).map((item) => ({
+            tier: item.tier || 'UNKNOWN',
+            thesis: item.thesis || 'No thesis available',
+            ...item,
+          }));
           const mergedWatchlist = remoteWatchlist.length >= 5
             ? remoteWatchlist
             : [
@@ -707,7 +746,18 @@ export function ValueTab() {
           setWatchlist(fallbackWatchlist);
         }
         if (bucketsResult.status === 'fulfilled') {
-          setBucketData(bucketsResult.value?.status === 'ok' ? bucketsResult.value : null);
+          const bucketsPayload = bucketsResult.value;
+          if (Array.isArray(bucketsPayload?.buckets)) {
+            setBucketData({
+              legacy_buckets: bucketsPayload.buckets,
+              total_allocation: bucketsPayload.total_allocation,
+              total_deployed: bucketsPayload.total_deployed,
+            });
+          } else if (bucketsPayload?.status === 'ok') {
+            setBucketData(bucketsPayload);
+          } else {
+            setBucketData(null);
+          }
         }
 
         setError(anySuccess ? null : 'Failed to load data. API may be offline.');
@@ -741,9 +791,18 @@ export function ValueTab() {
       )}
 
       {/* Portfolio Buckets */}
-      {bucketData && (
+      {bucketData?.buckets && (
         <section>
           <BucketDisplay buckets={bucketData.buckets} totalValue={bucketData.total_value} />
+        </section>
+      )}
+      {bucketData?.legacy_buckets && (
+        <section>
+          <LegacyBucketDisplay
+            buckets={bucketData.legacy_buckets}
+            totalAllocation={bucketData.total_allocation}
+            totalDeployed={bucketData.total_deployed}
+          />
         </section>
       )}
 
@@ -835,9 +894,13 @@ export function ValueTab() {
                           event.stopPropagation();
                           analyzeTicker(item.ticker);
                         }}
-                        className="text-xs px-3 py-1 bg-cyan-600 hover:bg-cyan-500 rounded text-white"
+                        className={`text-xs px-3 py-1 rounded text-white ${
+                          dcaLoading && dcaResult?.ticker === item.ticker
+                            ? 'bg-slate-600 cursor-wait'
+                            : 'bg-cyan-600 hover:bg-cyan-500'
+                        }`}
                       >
-                        Analyze DCA
+                        {dcaLoading && dcaResult?.ticker === item.ticker ? 'Loading...' : 'Analyze DCA'}
                       </button>
                     </td>
                   </tr>
