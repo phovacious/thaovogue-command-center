@@ -474,14 +474,16 @@ export function EquityTab() {
   const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
   const useMockStatus = import.meta.env?.VITE_USE_MOCK_STATUS === 'true';
 
+  // Simple lookup maps - same pattern for both, no normalization
+  const equityByKey = useMemo(() => {
+    const list = Array.isArray(equityStatus?.agents) ? equityStatus.agents : [];
+    return Object.fromEntries(list.map((agent) => [agent?.key, agent]));
+  }, [equityStatus]);
+
   const dipByKey = useMemo(() => {
     const list = Array.isArray(dipSniperStatus?.agents) ? dipSniperStatus.agents : [];
     return Object.fromEntries(list.map((agent) => [agent?.key, agent]));
   }, [dipSniperStatus]);
-
-  const getAgentStatus = (agent) => (
-    findStatusByKey(equityStatus?.agents, agent.key)
-  );
 
   useEffect(() => {
     if (debugStatus && dipSniperStatus) {
@@ -651,50 +653,33 @@ export function EquityTab() {
 
   return (
     <div className="px-4 space-y-6">
-      {/* DIAGNOSTICS PANEL - Always visible, cannot be hidden */}
-      <div style={{ background: '#1a1a2e', border: '2px solid #e94560', borderRadius: 8, padding: 12, fontSize: 11, fontFamily: 'monospace' }}>
-        <div style={{ color: '#e94560', fontWeight: 'bold', marginBottom: 8 }}>🔬 API DIAGNOSTICS (always visible)</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* Equity Status */}
-          <div style={{ background: '#0f0f23', padding: 8, borderRadius: 4 }}>
-            <div style={{ color: '#00d4ff', fontWeight: 'bold' }}>/api/equity/status</div>
-            <div style={{ color: diagnostics.equity?.status === 200 ? '#0f0' : '#f00' }}>
-              HTTP: {diagnostics.equity?.status || 'pending'}
+      {/* DIAGNOSTICS PANEL - Only visible when VITE_DEBUG_STATUS=true */}
+      {debugStatus && (
+        <div style={{ background: '#1a1a2e', border: '2px solid #e94560', borderRadius: 8, padding: 12, fontSize: 11, fontFamily: 'monospace' }}>
+          <div style={{ color: '#e94560', fontWeight: 'bold', marginBottom: 8 }}>🔬 API DIAGNOSTICS</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ background: '#0f0f23', padding: 8, borderRadius: 4 }}>
+              <div style={{ color: '#00d4ff', fontWeight: 'bold' }}>/api/equity/status</div>
+              <div style={{ color: diagnostics.equity?.status === 200 ? '#0f0' : '#f00' }}>
+                HTTP: {diagnostics.equity?.status || 'pending'}
+              </div>
+              <div style={{ color: '#ff0' }}>agents.length: {diagnostics.equity?.agentsLength ?? 'N/A'}</div>
+              <div style={{ color: '#ff0' }}>Keys: {JSON.stringify(diagnostics.equity?.agentKeys || [])}</div>
             </div>
-            <div style={{ color: '#888' }}>URL: {diagnostics.equity?.url || 'N/A'}</div>
-            <div style={{ color: '#888' }}>Content-Type: {diagnostics.equity?.contentType || 'N/A'}</div>
-            <div style={{ color: diagnostics.equity?.jsonOk ? '#0f0' : '#f00' }}>
-              JSON Parse: {diagnostics.equity?.jsonOk ? 'OK' : diagnostics.equity?.parseError || 'pending'}
-            </div>
-            <div style={{ color: '#ff0' }}>agents.length: {diagnostics.equity?.agentsLength ?? 'N/A'}</div>
-            <div style={{ color: '#ff0' }}>First 3 keys: {JSON.stringify(diagnostics.equity?.agentKeys || [])}</div>
-            <div style={{ color: '#666', fontSize: 10, marginTop: 4, wordBreak: 'break-all' }}>
-              Raw (300 chars): {diagnostics.equity?.rawText || 'N/A'}
-            </div>
-          </div>
-          {/* Dip Sniper Status */}
-          <div style={{ background: '#0f0f23', padding: 8, borderRadius: 4 }}>
-            <div style={{ color: '#00d4ff', fontWeight: 'bold' }}>/api/dip-sniper/status</div>
-            <div style={{ color: diagnostics.dipSniper?.status === 200 ? '#0f0' : '#f00' }}>
-              HTTP: {diagnostics.dipSniper?.status || 'pending'}
-            </div>
-            <div style={{ color: '#888' }}>URL: {diagnostics.dipSniper?.url || 'N/A'}</div>
-            <div style={{ color: '#888' }}>Content-Type: {diagnostics.dipSniper?.contentType || 'N/A'}</div>
-            <div style={{ color: diagnostics.dipSniper?.jsonOk ? '#0f0' : '#f00' }}>
-              JSON Parse: {diagnostics.dipSniper?.jsonOk ? 'OK' : diagnostics.dipSniper?.parseError || 'pending'}
-            </div>
-            <div style={{ color: '#ff0' }}>agents.length: {diagnostics.dipSniper?.agentsLength ?? 'N/A'}</div>
-            <div style={{ color: '#ff0' }}>First 3 keys: {JSON.stringify(diagnostics.dipSniper?.agentKeys || [])}</div>
-            <div style={{ color: '#666', fontSize: 10, marginTop: 4, wordBreak: 'break-all' }}>
-              Raw (300 chars): {diagnostics.dipSniper?.rawText || 'N/A'}
+            <div style={{ background: '#0f0f23', padding: 8, borderRadius: 4 }}>
+              <div style={{ color: '#00d4ff', fontWeight: 'bold' }}>/api/dip-sniper/status</div>
+              <div style={{ color: diagnostics.dipSniper?.status === 200 ? '#0f0' : '#f00' }}>
+                HTTP: {diagnostics.dipSniper?.status || 'pending'}
+              </div>
+              <div style={{ color: '#ff0' }}>agents.length: {diagnostics.dipSniper?.agentsLength ?? 'N/A'}</div>
+              <div style={{ color: '#ff0' }}>Keys: {JSON.stringify(diagnostics.dipSniper?.agentKeys || [])}</div>
             </div>
           </div>
+          <div style={{ marginTop: 8, color: '#888' }}>
+            equityByKey: {JSON.stringify(Object.keys(equityByKey))} | dipByKey: {JSON.stringify(Object.keys(dipByKey))}
+          </div>
         </div>
-        <div style={{ marginTop: 8, color: '#888', borderTop: '1px solid #333', paddingTop: 8 }}>
-          <div>State: equityStatus={equityStatus ? `${equityStatus.agents?.length} agents` : 'NULL'} | dipSniperStatus={dipSniperStatus ? `${dipSniperStatus.agents?.length} agents` : 'NULL'}</div>
-          <div>API_BASE: {API_BASE}</div>
-        </div>
-      </div>
+      )}
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -733,13 +718,11 @@ export function EquityTab() {
           <span>🤖</span> Equity Agents
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {EQUITY_AGENTS.filter((agent) => (
-            ['equity_alpha', 'equity_beta', 'equity_gamma'].includes(agent.key)
-          )).map((agent) => (
+          {EQUITY_AGENTS.map((agent) => (
             <AgentCard
               key={agent.key}
               agent={agent}
-              status={getAgentStatus(agent)}
+              status={equityByKey[agent.key]}
               onClick={() => setSelectedAgent(agent)}
             />
           ))}
@@ -785,10 +768,8 @@ export function EquityTab() {
         <EquityAgentModal
           agent={selectedAgent}
           status={selectedAgent.key?.startsWith('dip_sniper')
-            ? (Array.isArray(dipSniperStatus?.agents)
-              ? dipSniperStatus.agents.find((item) => item?.key === selectedAgent.key)
-              : undefined)
-            : getAgentStatus(selectedAgent)}
+            ? dipByKey[selectedAgent.key]
+            : equityByKey[selectedAgent.key]}
           trades={botTrades}
           stats={botStats}
           loading={botTradesLoading}
