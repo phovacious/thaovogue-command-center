@@ -327,13 +327,15 @@ function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
           {todaysTrades.length === 0 ? (
             <div className="text-slate-400 text-xs">No trades today.</div>
           ) : (
-            <div className="space-y-2 max-h-72 overflow-auto">
+            <div className="space-y-2 max-h-72 overflow-auto pointer-events-auto">
               {todaysTrades.map((trade, idx) => (
                 <button
                   key={idx}
                   type="button"
+                  onPointerUp={() => onSelectTrade(trade)}
                   onClick={() => onSelectTrade(trade)}
-                  className="w-full text-left text-xs text-slate-200 border-b border-slate-600/40 pb-2 hover:text-white hover:bg-slate-700/40 rounded px-2 py-1 transition-colors"
+                  aria-label={`Open trade ${trade.symbol || trade.pair || 'trade'}`}
+                  className="w-full text-left cursor-pointer text-xs text-slate-200 border-b border-slate-600/40 pb-2 hover:text-white hover:bg-slate-700/40 active:bg-slate-700/50 rounded px-2 py-1 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-400/40 pointer-events-auto"
                 >
                   <div className="text-slate-400">
                     {trade.symbol || trade.pair} • {trade.entry_time || '—'} → {trade.exit_time || '—'}
