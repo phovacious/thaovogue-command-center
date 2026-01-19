@@ -516,11 +516,13 @@ export function EquityTab() {
       if (mmData?.status === 'ok') {
         setIfActive(setMmStatus, mmData);
       }
+      console.log('=== EQUITY RAW ===', statusData);
       if (statusData) {
         setIfActive(setEquityStatus, {
           ...statusData,
           agents: normalizeAgents(statusData.agents),
         });
+        console.log('=== EQUITY STATE SET ===');
       }
       try {
         const dipStatus = await api.fetchApi('/api/dip-sniper/status', { signal });
@@ -554,6 +556,15 @@ export function EquityTab() {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (!equityStatus?.agents) return;
+    const keys = ['equity_alpha', 'equity_beta', 'equity_gamma'];
+    keys.forEach((key) => {
+      const result = findStatusByKey(equityStatus?.agents, key);
+      console.log('=== LOOKUP ===', key, 'equityStatus:', equityStatus, 'result:', result);
+    });
+  }, [equityStatus]);
 
   useEffect(() => {
     let active = true;
