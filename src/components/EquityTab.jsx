@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApi } from '../hooks/useApi';
 
 const EQUITY_DESCRIPTIONS = {
@@ -21,6 +21,11 @@ const EQUITY_AGENTS = [
   { key: 'spx_charlie', name: 'SPX Charlie' },
   { key: 'ultra_printer', name: 'Ultra Printer' },
   { key: 'bot_spx_recycler', name: 'SPX Recycler' },
+];
+
+const DIP_SNIPER_AGENTS = [
+  { key: 'dip_sniper_fixed', name: 'Dip Sniper Fixed' },
+  { key: 'dip_sniper_universe', name: 'Dip Sniper Universe' },
 ];
 
 const normalizeKey = (key) => (
@@ -401,6 +406,11 @@ export function EquityTab() {
   const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
   const useMockStatus = import.meta.env?.VITE_USE_MOCK_STATUS === 'true';
 
+  const dipByKey = useMemo(() => {
+    const list = Array.isArray(dipSniperStatus?.agents) ? dipSniperStatus.agents : [];
+    return Object.fromEntries(list.map((agent) => [agent?.key, agent]));
+  }, [dipSniperStatus]);
+
   const getAgentStatus = (agent) => {
     const directMatch = findStatusByKey(dipSniperStatus?.agents, agent.key)
       || findStatusByKey(equityStatus?.agents, agent.key);
@@ -416,6 +426,12 @@ export function EquityTab() {
     }
     return undefined;
   };
+
+  useEffect(() => {
+    if (debugStatus && dipSniperStatus) {
+      console.log('dipSniperStatus set', dipSniperStatus);
+    }
+  }, [debugStatus, dipSniperStatus]);
 
   const fetchData = async (signal) => {
     const setIfActive = (setter, value) => {
@@ -510,12 +526,15 @@ export function EquityTab() {
             {JSON.stringify({
               dipSniperStatus,
               dipSniperError,
-              agentsIsArray: Array.isArray(dipSniperStatus?.agents),
-              agentsPreview: normalizeAgents(dipSniperStatus?.agents).slice(0, 3),
-              targetKey: 'dip_sniper_fixed',
-              matchedStatus: getAgentStatus({ key: 'dip_sniper_fixed' }),
-              normalizedTarget: normalizeKey('dip_sniper_fixed'),
-              normalizedFound: normalizeKey(getItemKey(getAgentStatus({ key: 'dip_sniper_fixed' }) || {})),
+              uiKeys: DIP_SNIPER_AGENTS.map((agent) => agent.key),
+              apiKeys: Array.isArray(dipSniperStatus?.agents)
+                ? dipSniperStatus.agents.map((agent) => agent?.key)
+                : [],
+              mapped: DIP_SNIPER_AGENTS.map((agent) => ({
+                key: agent.key,
+                matched: !!dipByKey[agent.key],
+                running: dipByKey[agent.key]?.running,
+              })),
             }, null, 2)}
           </pre>
         </div>
@@ -544,6 +563,24 @@ export function EquityTab() {
               key={agent.key}
               agent={agent}
               status={getAgentStatus(agent)}
+              onClick={() => setSelectedAgent(agent)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+          <span>🎯</span> Dip Sniper Bots
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {DIP_SNIPER_AGENTS.map((agent) => (
+            <AgentCard
+              key={agent.key}
+              agent={agent}
+              status={Array.isArray(dipSniperStatus?.agents)
+                ? dipSniperStatus.agents.find((item) => item?.key === agent.key)
+                : undefined}
               onClick={() => setSelectedAgent(agent)}
             />
           ))}
@@ -588,7 +625,11 @@ export function EquityTab() {
       {selectedAgent && (
         <EquityAgentModal
           agent={selectedAgent}
-          status={getAgentStatus(selectedAgent)}
+          status={selectedAgent.key?.startsWith('dip_sniper')
+            ? (Array.isArray(dipSniperStatus?.agents)
+              ? dipSniperStatus.agents.find((item) => item?.key === selectedAgent.key)
+              : undefined)
+            : getAgentStatus(selectedAgent)}
           onClose={() => setSelectedAgent(null)}
         />
       )}
