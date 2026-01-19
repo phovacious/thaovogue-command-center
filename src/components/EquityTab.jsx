@@ -456,6 +456,8 @@ function BacktestResultsCard() {
   );
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'https://159-65-250-246.sslip.io';
+
 export function EquityTab() {
   const api = useApi();
   const [mmStatus, setMmStatus] = useState(null);
@@ -468,6 +470,7 @@ export function EquityTab() {
   const [botStats, setBotStats] = useState(null);
   const [botTradesLoading, setBotTradesLoading] = useState(false);
   const [botTradesError, setBotTradesError] = useState(null);
+  const [diagnostics, setDiagnostics] = useState({});
   const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
   const useMockStatus = import.meta.env?.VITE_USE_MOCK_STATUS === 'true';
 
@@ -486,6 +489,36 @@ export function EquityTab() {
     }
   }, [debugStatus, dipSniperStatus]);
 
+  // Diagnostic fetch that captures raw request/response details
+  const diagFetch = async (endpoint, label) => {
+    const url = `${API_BASE}${endpoint}`;
+    const result = { url, label, timestamp: new Date().toISOString() };
+    try {
+      const resp = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      result.status = resp.status;
+      result.contentType = resp.headers.get('content-type');
+      const text = await resp.text();
+      result.rawText = text.slice(0, 300);
+      result.rawLength = text.length;
+      try {
+        const json = JSON.parse(text);
+        result.jsonOk = true;
+        result.agentsLength = Array.isArray(json.agents) ? json.agents.length : 'not array';
+        result.agentKeys = Array.isArray(json.agents) ? json.agents.slice(0, 3).map(a => a?.key) : [];
+        return { result, data: json };
+      } catch (parseErr) {
+        result.jsonOk = false;
+        result.parseError = parseErr.message;
+        return { result, data: null };
+      }
+    } catch (fetchErr) {
+      result.fetchError = fetchErr.message;
+      return { result, data: null };
+    }
+  };
+
   const fetchData = async (signal) => {
     const setIfActive = (setter, value) => {
       if (!signal?.aborted) {
@@ -503,44 +536,46 @@ export function EquityTab() {
         return;
       }
 
+      // Fetch with diagnostics
+      const [equityResult, dipResult] = await Promise.all([
+        diagFetch('/api/equity/status', 'equity'),
+        diagFetch('/api/dip-sniper/status', 'dip-sniper'),
+      ]);
+
+      setIfActive(setDiagnostics, {
+        equity: equityResult.result,
+        dipSniper: dipResult.result,
+      });
+
+      // Also fetch MM status via normal api
       let mmData;
-      let statusData;
       try {
-        [mmData, statusData] = await Promise.all([
-          api.fetchApi('/api/equity/morning-momentum/status', { signal }),
-          api.fetchApi('/api/equity/status', { signal }),
-        ]);
+        mmData = await api.fetchApi('/api/equity/morning-momentum/status', { signal });
       } catch (e) {
-        console.error('Equity status fetch failed:', e);
+        console.error('MM fetch failed:', e);
       }
       if (mmData?.status === 'ok') {
         setIfActive(setMmStatus, mmData);
       }
-      console.log('=== EQUITY RAW ===', statusData);
-      if (statusData) {
+
+      // Set equity status
+      if (equityResult.data) {
         setIfActive(setEquityStatus, {
-          ...statusData,
-          agents: normalizeAgents(statusData.agents),
+          ...equityResult.data,
+          agents: normalizeAgents(equityResult.data.agents),
         });
-        console.log('=== EQUITY STATE SET ===');
       }
-      try {
-        const dipStatus = await api.fetchApi('/api/dip-sniper/status', { signal });
-        console.log('[RAW DIP-SNIPER RESPONSE]', JSON.stringify(dipStatus, null, 2));
-        console.log('[RAW] typeof agents:', typeof dipStatus?.agents, 'isArray:', Array.isArray(dipStatus?.agents));
-        if (dipStatus) {
-          setIfActive(setDipSniperStatus, {
-            ...dipStatus,
-            agents: normalizeAgents(dipStatus.agents),
-          });
-          setIfActive(setDipSniperError, null);
-        }
-      } catch (e) {
-        setIfActive(setDipSniperError, e?.message || 'Dip sniper fetch failed');
-        console.error('Dip sniper status fetch failed:', e);
+
+      // Set dip sniper status
+      if (dipResult.data) {
+        setIfActive(setDipSniperStatus, {
+          ...dipResult.data,
+          agents: normalizeAgents(dipResult.data.agents),
+        });
+        setIfActive(setDipSniperError, null);
       }
     } catch (e) {
-      console.error('Failed to fetch morning momentum status:', e);
+      console.error('Fetch error:', e);
     }
     if (!signal?.aborted) {
       setLoading(false);
@@ -616,31 +651,50 @@ export function EquityTab() {
 
   return (
     <div className="px-4 space-y-6">
-      <div style={{ background: '#111', color: '#0f0', padding: 10, fontSize: 12, marginBottom: 10 }}>
-        <div>equityStatus: {equityStatus ? `${equityStatus.agents?.length} agents` : 'NULL'}</div>
-        <div>dipSniperStatus: {dipSniperStatus ? `${dipSniperStatus.agents?.length} agents` : 'NULL'}</div>
-        <div>First equity agent: {JSON.stringify(equityStatus?.agents?.[0])}</div>
-      </div>
-      {debugStatus && (
-        <div className="bg-slate-800/70 border border-slate-700 rounded px-3 py-2 text-xs text-slate-300">
-          <div className="font-semibold mb-1">Status Debug</div>
-          <pre className="whitespace-pre-wrap break-words">
-            {JSON.stringify({
-              dipSniperStatus,
-              dipSniperError,
-              uiKeys: DIP_SNIPER_AGENTS.map((agent) => agent.key),
-              apiKeys: Array.isArray(dipSniperStatus?.agents)
-                ? dipSniperStatus.agents.map((agent) => agent?.key)
-                : [],
-              mapped: DIP_SNIPER_AGENTS.map((agent) => ({
-                key: agent.key,
-                matched: !!dipByKey[agent.key],
-                running: dipByKey[agent.key]?.running,
-              })),
-            }, null, 2)}
-          </pre>
+      {/* DIAGNOSTICS PANEL - Always visible, cannot be hidden */}
+      <div style={{ background: '#1a1a2e', border: '2px solid #e94560', borderRadius: 8, padding: 12, fontSize: 11, fontFamily: 'monospace' }}>
+        <div style={{ color: '#e94560', fontWeight: 'bold', marginBottom: 8 }}>🔬 API DIAGNOSTICS (always visible)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* Equity Status */}
+          <div style={{ background: '#0f0f23', padding: 8, borderRadius: 4 }}>
+            <div style={{ color: '#00d4ff', fontWeight: 'bold' }}>/api/equity/status</div>
+            <div style={{ color: diagnostics.equity?.status === 200 ? '#0f0' : '#f00' }}>
+              HTTP: {diagnostics.equity?.status || 'pending'}
+            </div>
+            <div style={{ color: '#888' }}>URL: {diagnostics.equity?.url || 'N/A'}</div>
+            <div style={{ color: '#888' }}>Content-Type: {diagnostics.equity?.contentType || 'N/A'}</div>
+            <div style={{ color: diagnostics.equity?.jsonOk ? '#0f0' : '#f00' }}>
+              JSON Parse: {diagnostics.equity?.jsonOk ? 'OK' : diagnostics.equity?.parseError || 'pending'}
+            </div>
+            <div style={{ color: '#ff0' }}>agents.length: {diagnostics.equity?.agentsLength ?? 'N/A'}</div>
+            <div style={{ color: '#ff0' }}>First 3 keys: {JSON.stringify(diagnostics.equity?.agentKeys || [])}</div>
+            <div style={{ color: '#666', fontSize: 10, marginTop: 4, wordBreak: 'break-all' }}>
+              Raw (300 chars): {diagnostics.equity?.rawText || 'N/A'}
+            </div>
+          </div>
+          {/* Dip Sniper Status */}
+          <div style={{ background: '#0f0f23', padding: 8, borderRadius: 4 }}>
+            <div style={{ color: '#00d4ff', fontWeight: 'bold' }}>/api/dip-sniper/status</div>
+            <div style={{ color: diagnostics.dipSniper?.status === 200 ? '#0f0' : '#f00' }}>
+              HTTP: {diagnostics.dipSniper?.status || 'pending'}
+            </div>
+            <div style={{ color: '#888' }}>URL: {diagnostics.dipSniper?.url || 'N/A'}</div>
+            <div style={{ color: '#888' }}>Content-Type: {diagnostics.dipSniper?.contentType || 'N/A'}</div>
+            <div style={{ color: diagnostics.dipSniper?.jsonOk ? '#0f0' : '#f00' }}>
+              JSON Parse: {diagnostics.dipSniper?.jsonOk ? 'OK' : diagnostics.dipSniper?.parseError || 'pending'}
+            </div>
+            <div style={{ color: '#ff0' }}>agents.length: {diagnostics.dipSniper?.agentsLength ?? 'N/A'}</div>
+            <div style={{ color: '#ff0' }}>First 3 keys: {JSON.stringify(diagnostics.dipSniper?.agentKeys || [])}</div>
+            <div style={{ color: '#666', fontSize: 10, marginTop: 4, wordBreak: 'break-all' }}>
+              Raw (300 chars): {diagnostics.dipSniper?.rawText || 'N/A'}
+            </div>
+          </div>
         </div>
-      )}
+        <div style={{ marginTop: 8, color: '#888', borderTop: '1px solid #333', paddingTop: 8 }}>
+          <div>State: equityStatus={equityStatus ? `${equityStatus.agents?.length} agents` : 'NULL'} | dipSniperStatus={dipSniperStatus ? `${dipSniperStatus.agents?.length} agents` : 'NULL'}</div>
+          <div>API_BASE: {API_BASE}</div>
+        </div>
+      </div>
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
