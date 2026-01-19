@@ -97,7 +97,7 @@ function EventCard({ event }) {
 }
 
 // Trade Card
-function TradeCard({ trade }) {
+function TradeCard({ trade, onClick }) {
   const pnl = trade.pnl ?? 0;
   const isWin = trade.win || pnl > 0;
   const size = trade.size ?? trade.size_usd ?? 0;
@@ -105,7 +105,11 @@ function TradeCard({ trade }) {
   const action = trade.action || trade.side || '';
 
   return (
-    <div className={`p-3 rounded-lg border ${isWin ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`p-3 rounded-lg border w-full text-left transition-colors cursor-pointer hover:border-cyan-500/60 ${isWin ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}
+    >
       <div className="flex justify-between items-start mb-2">
         <div>
           <span className="font-mono font-bold text-white">{trade.pair || trade.symbol}</span>
@@ -130,6 +134,105 @@ function TradeCard({ trade }) {
       </div>
       <div className="text-xs text-slate-500 mt-2">
         {trade.exit_reason} • {trade.exit_time ? new Date(trade.exit_time).toLocaleString() : 'N/A'}
+      </div>
+    </button>
+  );
+}
+
+// Trade Detail Modal
+function TradeDetailModal({ trade, onClose }) {
+  if (!trade) return null;
+
+  const pnl = trade.pnl ?? 0;
+  const isWin = trade.win || pnl > 0;
+  const size = trade.size ?? trade.size_usd ?? 0;
+  const pnlPct = trade.pnl_pct ?? 0;
+  const action = trade.action || trade.side || '';
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-800 rounded-lg p-6 max-w-md w-full border border-slate-600"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-white">{trade.pair || trade.symbol}</h2>
+            <div className="flex gap-2 mt-1">
+              {action && (
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${action === 'LONG' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                  {action}
+                </span>
+              )}
+              <span className={`px-2 py-0.5 rounded text-xs font-bold ${isWin ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {isWin ? 'WIN' : 'LOSS'}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-slate-400">Entry Price</div>
+              <div className="text-lg font-mono text-white">${trade.entry_price?.toFixed(4)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">Exit Price</div>
+              <div className="text-lg font-mono text-white">${trade.exit_price?.toFixed(4)}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-slate-400">Size (USD)</div>
+              <div className="text-lg font-mono text-white">${size.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">P&L</div>
+              <div className={`text-lg font-mono font-bold ${isWin ? 'text-green-400' : 'text-red-400'}`}>
+                {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({(pnlPct * 100).toFixed(2)}%)
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-700 pt-3">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="text-slate-400">Exit Reason</div>
+                <div className="text-white capitalize">{trade.exit_reason || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-slate-400">Trade ID</div>
+                <div className="text-white font-mono text-xs">{trade.id || 'N/A'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-700 pt-3">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="text-slate-400">Entry Time</div>
+                <div className="text-white text-xs">{trade.entry_time ? new Date(trade.entry_time).toLocaleString() : 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-slate-400">Exit Time</div>
+                <div className="text-white text-xs">{trade.exit_time ? new Date(trade.exit_time).toLocaleString() : 'N/A'}</div>
+              </div>
+            </div>
+          </div>
+
+          {trade.signal?.reasoning && (
+            <div className="border-t border-slate-700 pt-3">
+              <div className="text-sm text-slate-400">Signal Reasoning</div>
+              <div className="text-white text-sm mt-1">{trade.signal.reasoning}</div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -276,6 +379,7 @@ export function CryptoTab() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [eventsUpdatedAt, setEventsUpdatedAt] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [selectedTrade, setSelectedTrade] = useState(null);
   const [tradesDebug, setTradesDebug] = useState(null);
   const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
 
@@ -631,7 +735,13 @@ export function CryptoTab() {
           </h2>
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {trades.length > 0 ? (
-              trades.map((trade, i) => <TradeCard key={i} trade={trade} />)
+              trades.map((trade, i) => (
+                <TradeCard
+                  key={i}
+                  trade={trade}
+                  onClick={() => setSelectedTrade(trade)}
+                />
+              ))
             ) : (
               <div className="bg-slate-800 rounded-lg p-8 text-center text-slate-400">
                 No trades recorded yet. Waiting for signals.
@@ -640,6 +750,13 @@ export function CryptoTab() {
           </div>
         </section>
       </div>
+
+      {selectedTrade && (
+        <TradeDetailModal
+          trade={selectedTrade}
+          onClose={() => setSelectedTrade(null)}
+        />
+      )}
 
       {selectedAgent && (
         <AgentDetailModal
