@@ -14,3 +14,10 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Vercel Deployment Metadata
+
+Set these environment variables (Production + Preview) so the UI footer shows the deployed version:
+
+- `VITE_APP_VERSION`: short commit SHA (e.g., `46da01d`)
+- `VITE_BUILD_TIME`: ISO timestamp (e.g., `2026-01-18T23:45:00Z`)

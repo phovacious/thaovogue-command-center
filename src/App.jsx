@@ -14,7 +14,8 @@ function App() {
   const api = useApi();
   const [marketClock, setMarketClock] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const appVersion = import.meta.env.VITE_APP_VERSION || 'dev';
+  const appVersionRaw = import.meta.env.VITE_APP_VERSION || 'dev';
+  const appVersion = appVersionRaw === 'dev' ? 'dev' : appVersionRaw.slice(0, 7);
   const buildTime = import.meta.env.VITE_BUILD_TIME || 'dev';
 
   // Global refresh function
