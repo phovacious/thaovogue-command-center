@@ -14,6 +14,8 @@ function App() {
   const api = useApi();
   const [marketClock, setMarketClock] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const appVersion = import.meta.env.VITE_APP_VERSION || 'dev';
+  const buildTime = import.meta.env.VITE_BUILD_TIME || 'dev';
 
   // Global refresh function
   const handleGlobalRefresh = async () => {
@@ -79,7 +81,7 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="py-4 text-center text-slate-500 text-sm">
+      <footer className="py-4 text-center text-slate-500 text-sm relative">
         <div>Thaovogue Swarm v4.3.0</div>
         <div className="text-xs mt-1">
           {isConnected ? (
@@ -90,6 +92,9 @@ function App() {
           {marketClock && (
             <span className="ml-2 text-slate-600">• {marketClock.status}</span>
           )}
+        </div>
+        <div className="absolute right-4 bottom-3 text-xs text-slate-600">
+          {appVersion} • {buildTime}
         </div>
       </footer>
     </div>
