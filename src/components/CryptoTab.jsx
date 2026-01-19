@@ -157,6 +157,7 @@ function TradeDetailModal({ trade, onClose }) {
   const noteStorageKey = `crypto_trade_note:${noteKeyBase}`;
   const [note, setNote] = useState('');
   const [noteStatus, setNoteStatus] = useState('saved');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!trade) return;
@@ -178,6 +179,71 @@ function TradeDetailModal({ trade, onClose }) {
     ? (Math.abs(entryPrice - stopPrice) / entryPrice) * size
     : null;
   const rMultiple = riskDollars && riskDollars > 0 ? pnl / riskDollars : null;
+
+  const handleCopy = async () => {
+    const symbol = safeTrade.symbol || safeTrade.pair || 'N/A';
+    const entry = safeTrade.entry_price ?? '—';
+    const exit = safeTrade.exit_price ?? '—';
+    const stop = safeTrade.stop_price ?? safeTrade.stop ?? '—';
+    const target = safeTrade.target ?? safeTrade.take_profit ?? '—';
+    const mode = safeTrade.mode || safeTrade.trade_mode || 'paper';
+    const reason = safeTrade.exit_reason || safeTrade.reason || '—';
+    const entryEt = formatTimeEt(safeTrade.entry_time);
+    const exitEt = formatTimeEt(safeTrade.exit_time);
+    const entryReason = safeTrade.entry_reason || safeTrade.signal?.reasoning || '—';
+    const pnlPercent = (pnlPct * 100).toFixed(2);
+    const sizeUsd = Number.isFinite(size) ? size.toFixed(2) : size;
+    const text = [
+      `Trade: ${symbol}`,
+      `Mode: ${mode}`,
+      `Trade ID: ${tradeId || '—'}`,
+      `Entry: ${entry} | Exit: ${exit}`,
+      `Size USD: ${sizeUsd}`,
+      `P&L: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPercent}%)`,
+      `Reason: ${reason}`,
+      `Entry Time (ET): ${entryEt}`,
+      `Exit Time (ET): ${exitEt}`,
+      `Hold Duration: ${durationLabel}`,
+      `Thresholds: stop=${stop} target=${target}`,
+      `Entry Logic: ${entryReason}`,
+      `Journal Note: ${note || '—'}`,
+    ].join('\n');
+
+    const doClipboardCopy = async () => {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+      return false;
+    };
+
+    let copiedOk = false;
+    try {
+      copiedOk = await doClipboardCopy();
+    } catch (e) {
+      copiedOk = false;
+    }
+
+    if (!copiedOk) {
+      try {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        temp.setAttribute('readonly', '');
+        temp.style.position = 'absolute';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+        temp.select();
+        temp.setSelectionRange(0, temp.value.length);
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+      } catch (e) {
+        return;
+      }
+    }
+
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   if (!trade) return null;
 
@@ -204,7 +270,16 @@ function TradeDetailModal({ trade, onClose }) {
               </span>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="text-xs px-3 py-1 rounded border border-slate-500 text-slate-200 hover:bg-slate-700/60"
+            >
+              {copied ? 'Copied ✓' : 'Copy'}
+            </button>
+            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+          </div>
         </div>
 
         <div className="space-y-3">
