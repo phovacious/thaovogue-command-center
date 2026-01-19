@@ -148,6 +148,11 @@ function TradeDetailModal({ trade, onClose }) {
   const size = trade.size ?? trade.size_usd ?? 0;
   const pnlPct = trade.pnl_pct ?? 0;
   const action = trade.action || trade.side || '';
+  const entryTime = trade.entry_time ? new Date(trade.entry_time) : null;
+  const exitTime = trade.exit_time ? new Date(trade.exit_time) : null;
+  const durationLabel = entryTime && exitTime
+    ? formatDuration(exitTime.getTime() - entryTime.getTime())
+    : '—';
 
   return (
     <div
@@ -223,6 +228,10 @@ function TradeDetailModal({ trade, onClose }) {
                 <div className="text-slate-400">Exit Time</div>
                 <div className="text-white text-xs">{trade.exit_time ? new Date(trade.exit_time).toLocaleString() : 'N/A'}</div>
               </div>
+              <div>
+                <div className="text-slate-400">Hold Duration</div>
+                <div className="text-white text-xs">{durationLabel}</div>
+              </div>
             </div>
           </div>
 
@@ -230,6 +239,104 @@ function TradeDetailModal({ trade, onClose }) {
             <div className="border-t border-slate-700 pt-3">
               <div className="text-sm text-slate-400">Signal Reasoning</div>
               <div className="text-white text-sm mt-1">{trade.signal.reasoning}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+  }
+  return `${seconds}s`;
+}
+
+function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
+  const today = summary?.today_date || new Date().toISOString().slice(0, 10);
+  const todaysTrades = trades.filter((trade) => (trade.exit_time || '').startsWith(today));
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-slate-800 rounded-lg p-6 max-w-3xl w-full border border-slate-600" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-white">Today's Activity</h2>
+            <div className="text-sm text-slate-400">{today}</div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
+          <div>
+            <div className="text-slate-400">Scans</div>
+            <div className="text-white font-mono">{status?.scans_today ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Signals</div>
+            <div className="text-cyan-400 font-mono">{status?.signals_today ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Trades</div>
+            <div className="text-white font-mono">{summary?.daily_trades ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Active Positions</div>
+            <div className="text-yellow-400 font-mono">{status?.active_positions ?? 0}</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
+          <div>
+            <div className="text-slate-400">Today P&L</div>
+            <div className="text-white font-mono">{summary?.daily_pnl ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Wins</div>
+            <div className="text-green-400 font-mono">{summary?.daily_wins ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Losses</div>
+            <div className="text-red-400 font-mono">{summary?.daily_losses ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Trades</div>
+            <div className="text-white font-mono">{summary?.daily_trades ?? 0}</div>
+          </div>
+        </div>
+
+        <div className="bg-slate-700/50 rounded p-3 text-sm">
+          <div className="text-xs text-slate-400 mb-2">Today's Trades</div>
+          {todaysTrades.length === 0 ? (
+            <div className="text-slate-400 text-xs">No trades today.</div>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-auto">
+              {todaysTrades.map((trade, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => onSelectTrade(trade)}
+                  className="w-full text-left text-xs text-slate-200 border-b border-slate-600/40 pb-2 hover:text-white"
+                >
+                  <div className="text-slate-400">
+                    {trade.symbol || trade.pair} • {trade.entry_time || '—'} → {trade.exit_time || '—'}
+                  </div>
+                  <div className="flex justify-between">
+                    <span>P&L: {trade.pnl ?? 0}</span>
+                    <span>{trade.exit_reason || '—'}</span>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -576,6 +683,7 @@ export function CryptoTab() {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [selectedTrade, setSelectedTrade] = useState(null);
   const [showPnlModal, setShowPnlModal] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
   const [tradesDebug, setTradesDebug] = useState(null);
   const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
 
@@ -781,8 +889,15 @@ export function CryptoTab() {
         <PnLCard summary={summary} onClick={() => setShowPnlModal(true)} />
 
         {/* Quick Stats */}
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <h3 className="text-lg font-bold text-white mb-3">📊 Today's Activity</h3>
+        <button
+          type="button"
+          onClick={() => setShowActivityModal(true)}
+          className="bg-slate-800 rounded-lg p-4 border border-slate-700 text-left transition-colors cursor-pointer hover:border-cyan-500/60 hover:bg-slate-800/80"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-white">📊 Today's Activity</h3>
+            <span className="text-xs text-slate-400">tap for details</span>
+          </div>
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-slate-400">Scans</span>
@@ -801,7 +916,7 @@ export function CryptoTab() {
               <span className="font-mono text-yellow-400">{status?.active_positions || 0}</span>
             </div>
           </div>
-        </div>
+        </button>
 
         {/* Config */}
         <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
@@ -967,6 +1082,15 @@ export function CryptoTab() {
           trades={trades}
           onClose={() => setShowPnlModal(false)}
           debugStatus={debugStatus}
+        />
+      )}
+      {showActivityModal && (
+        <ActivityModal
+          status={status}
+          summary={summary}
+          trades={trades}
+          onSelectTrade={(trade) => setSelectedTrade(trade)}
+          onClose={() => setShowActivityModal(false)}
         />
       )}
 
