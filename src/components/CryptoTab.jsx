@@ -221,12 +221,12 @@ function TradeDetailModal({ trade, onClose }) {
           <div className="border-t border-slate-700 pt-3">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <div className="text-slate-400">Entry Time</div>
-                <div className="text-white text-xs">{trade.entry_time ? new Date(trade.entry_time).toLocaleString() : 'N/A'}</div>
+                <div className="text-slate-400">Entry Time (ET)</div>
+                <div className="text-white text-xs">{formatTimeEt(trade.entry_time)}</div>
               </div>
               <div>
-                <div className="text-slate-400">Exit Time</div>
-                <div className="text-white text-xs">{trade.exit_time ? new Date(trade.exit_time).toLocaleString() : 'N/A'}</div>
+                <div className="text-slate-400">Exit Time (ET)</div>
+                <div className="text-white text-xs">{formatTimeEt(trade.exit_time)}</div>
               </div>
               <div>
                 <div className="text-slate-400">Hold Duration</div>
@@ -260,6 +260,13 @@ function formatDuration(ms) {
     return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
   }
   return `${seconds}s`;
+}
+
+function formatTimeEt(value) {
+  if (!value) return '—';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return '—';
+  return dt.toLocaleString('en-US', { timeZone: 'America/New_York' });
 }
 
 function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
@@ -326,7 +333,7 @@ function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
                   key={idx}
                   type="button"
                   onClick={() => onSelectTrade(trade)}
-                  className="w-full text-left text-xs text-slate-200 border-b border-slate-600/40 pb-2 hover:text-white"
+                  className="w-full text-left text-xs text-slate-200 border-b border-slate-600/40 pb-2 hover:text-white hover:bg-slate-700/40 rounded px-2 py-1 transition-colors"
                 >
                   <div className="text-slate-400">
                     {trade.symbol || trade.pair} • {trade.entry_time || '—'} → {trade.exit_time || '—'}
