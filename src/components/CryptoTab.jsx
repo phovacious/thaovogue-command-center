@@ -272,9 +272,11 @@ function formatTimeEt(value) {
 function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
   const today = summary?.today_date || new Date().toISOString().slice(0, 10);
   const todaysTrades = trades.filter((trade) => (trade.exit_time || '').startsWith(today));
+  const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
+  const [lastTappedTradeId, setLastTappedTradeId] = useState(null);
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4" onClick={onClose}>
       <div className="bg-slate-800 rounded-lg p-6 max-w-3xl w-full border border-slate-600" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-4">
           <div>
@@ -332,8 +334,14 @@ function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
                 <button
                   key={idx}
                   type="button"
-                  onPointerUp={() => onSelectTrade(trade)}
-                  onClick={() => onSelectTrade(trade)}
+                  onPointerUp={() => {
+                    setLastTappedTradeId(trade.id || trade.symbol || trade.pair || String(idx));
+                    onSelectTrade(trade);
+                  }}
+                  onClick={() => {
+                    setLastTappedTradeId(trade.id || trade.symbol || trade.pair || String(idx));
+                    onSelectTrade(trade);
+                  }}
                   aria-label={`Open trade ${trade.symbol || trade.pair || 'trade'}`}
                   className="w-full text-left cursor-pointer text-xs text-slate-200 border-b border-slate-600/40 pb-2 hover:text-white hover:bg-slate-700/40 active:bg-slate-700/50 rounded px-2 py-1 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-400/40 pointer-events-auto"
                 >
@@ -349,6 +357,11 @@ function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
             </div>
           )}
         </div>
+        {debugStatus && (
+          <div className="mt-3 text-xs text-slate-400">
+            Last tapped: {lastTappedTradeId ?? '—'}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -775,6 +788,11 @@ export function CryptoTab() {
     }
   };
 
+  const openTradeFromActivity = (trade) => {
+    setShowActivityModal(false);
+    setTimeout(() => setSelectedTrade(trade), 0);
+  };
+
   useEffect(() => {
     fetchData();
     let interval;
@@ -1098,7 +1116,7 @@ export function CryptoTab() {
           status={status}
           summary={summary}
           trades={trades}
-          onSelectTrade={(trade) => setSelectedTrade(trade)}
+          onSelectTrade={openTradeFromActivity}
           onClose={() => setShowActivityModal(false)}
         />
       )}
