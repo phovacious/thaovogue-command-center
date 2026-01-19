@@ -616,6 +616,11 @@ export function EquityTab() {
 
   return (
     <div className="px-4 space-y-6">
+      <div style={{ background: '#111', color: '#0f0', padding: 10, fontSize: 12, marginBottom: 10 }}>
+        <div>equityStatus: {equityStatus ? `${equityStatus.agents?.length} agents` : 'NULL'}</div>
+        <div>dipSniperStatus: {dipSniperStatus ? `${dipSniperStatus.agents?.length} agents` : 'NULL'}</div>
+        <div>First equity agent: {JSON.stringify(equityStatus?.agents?.[0])}</div>
+      </div>
       {debugStatus && (
         <div className="bg-slate-800/70 border border-slate-700 rounded px-3 py-2 text-xs text-slate-300">
           <div className="font-semibold mb-1">Status Debug</div>
