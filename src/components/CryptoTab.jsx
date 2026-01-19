@@ -238,37 +238,63 @@ function TradeDetailModal({ trade, onClose }) {
   );
 }
 
-// P&L Summary Card
-function PnLCard({ pnl }) {
-  const totalPnl = pnl?.total_pnl || 0;
+// P&L Summary Card - uses summary from unified trades endpoint
+function PnLCard({ summary }) {
+  const totalPnl = summary?.total_pnl ?? 0;
+  const dailyPnl = summary?.daily_pnl ?? 0;
   const isPositive = totalPnl >= 0;
+  const isDailyPositive = dailyPnl >= 0;
+
+  // Format first trade date for context
+  const firstTradeDate = summary?.first_trade_time
+    ? new Date(summary.first_trade_time).toLocaleDateString()
+    : null;
 
   return (
     <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-      <h3 className="text-lg font-bold text-white mb-3">💰 Crypto P&L</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-bold text-white">💰 Crypto P&L</h3>
+        {firstTradeDate && (
+          <span className="text-xs text-slate-500">Since {firstTradeDate}</span>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <div className="text-sm text-slate-400">Total P&L</div>
+          <div className="text-sm text-slate-400">All-Time P&L</div>
           <div className={`text-2xl font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-            {isPositive ? '+' : ''}${Math.abs(totalPnl).toFixed(2)}
+            {isPositive ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
+          </div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Today ({summary?.today_date || 'N/A'})</div>
+          <div className={`text-2xl font-mono font-bold ${isDailyPositive ? 'text-green-400' : 'text-red-400'}`}>
+            {isDailyPositive ? '+' : '-'}${Math.abs(dailyPnl).toFixed(2)}
           </div>
         </div>
         <div>
           <div className="text-sm text-slate-400">Win Rate</div>
-          <div className="text-2xl font-mono font-bold text-cyan-400">
-            {pnl?.win_rate ? (pnl.win_rate * 100).toFixed(1) : '0'}%
+          <div className="text-xl font-mono font-bold text-cyan-400">
+            {summary?.win_rate ? (summary.win_rate * 100).toFixed(1) : '0'}%
           </div>
         </div>
         <div>
-          <div className="text-sm text-slate-400">Total Trades</div>
-          <div className="text-lg font-mono text-white">{pnl?.total_trades || 0}</div>
+          <div className="text-sm text-slate-400">Trades (All / Today)</div>
+          <div className="text-lg font-mono text-white">
+            {summary?.total_trades ?? 0}
+            <span className="text-slate-500"> / </span>
+            <span className="text-cyan-400">{summary?.daily_trades ?? 0}</span>
+          </div>
         </div>
-        <div>
+        <div className="col-span-2">
           <div className="text-sm text-slate-400">Wins / Losses</div>
           <div className="text-lg font-mono">
-            <span className="text-green-400">{pnl?.wins || 0}</span>
+            <span className="text-green-400">{summary?.wins ?? 0}</span>
             <span className="text-slate-500"> / </span>
-            <span className="text-red-400">{pnl?.losses || 0}</span>
+            <span className="text-red-400">{summary?.losses ?? 0}</span>
+            <span className="text-slate-500 text-sm ml-2">
+              (today: <span className="text-green-400">{summary?.daily_wins ?? 0}</span>
+              /<span className="text-red-400">{summary?.daily_losses ?? 0}</span>)
+            </span>
           </div>
         </div>
       </div>
@@ -373,7 +399,7 @@ export function CryptoTab() {
   const [status, setStatus] = useState(null);
   const [events, setEvents] = useState([]);
   const [trades, setTrades] = useState([]);
-  const [pnl, setPnl] = useState(null);
+  const [summary, setSummary] = useState(null);
   const [dcaWatchlist, setDcaWatchlist] = useState({ tokens: {}, labels: {}, blacklist: [] });
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -385,11 +411,11 @@ export function CryptoTab() {
 
   const fetchData = async () => {
     try {
-      const [statusResult, eventsResult, tradesResult, pnlResult, dcaResult] = await Promise.allSettled([
+      // Single source of truth: trades endpoint now returns both trades AND summary
+      const [statusResult, eventsResult, tradesResult, dcaResult] = await Promise.allSettled([
         api.fetchApi('/api/crypto/status'),
         api.fetchApi('/api/crypto/events?limit=20'),
         api.fetchApi('/api/crypto/trades?limit=10'),
-        api.fetchApi('/api/crypto/pnl'),
         api.fetchApi('/api/crypto/dca-watchlist'),
       ]);
 
@@ -412,21 +438,24 @@ export function CryptoTab() {
         setEventsUpdatedAt(new Date());
       }
 
+      // Unified trades + summary from single endpoint (single source of truth)
       if (tradesResult.status === 'fulfilled') {
         const tradesData = tradesResult.value?.trades || [];
+        const summaryData = tradesResult.value?.summary || null;
         setTrades(tradesData);
+        setSummary(summaryData);
         setTradesDebug({
           status: 'ok',
-          count: tradesData.length,
-          firstIds: tradesData.slice(0, 3).map((t) => t.id),
-          firstTrade: tradesData[0] ? Object.keys(tradesData[0]) : [],
+          endpoint: '/api/crypto/trades',
+          tradesCount: tradesData.length,
+          summaryPresent: !!summaryData,
+          totalPnl: summaryData?.total_pnl,
+          totalTrades: summaryData?.total_trades,
+          dailyTrades: summaryData?.daily_trades,
+          firstTradeTime: summaryData?.first_trade_time,
         });
       } else {
         setTradesDebug({ status: 'failed', error: tradesResult.reason?.message });
-      }
-
-      if (pnlResult.status === 'fulfilled') {
-        setPnl(pnlResult.value);
       }
 
       if (dcaResult.status === 'fulfilled') {
@@ -499,11 +528,15 @@ export function CryptoTab() {
       {/* Diagnostics Panel - gated behind VITE_DEBUG_STATUS */}
       {debugStatus && (
         <div style={{ background: '#1a1a2e', border: '2px solid #e94560', borderRadius: 8, padding: 12, fontSize: 11, fontFamily: 'monospace' }}>
-          <div style={{ color: '#e94560', fontWeight: 'bold', marginBottom: 8 }}>🔬 CRYPTO DIAGNOSTICS</div>
-          <div style={{ color: '#0f0' }}>Trades API: {tradesDebug?.status || 'pending'}</div>
-          <div style={{ color: '#ff0' }}>trades.length: {trades.length}</div>
-          <div style={{ color: '#ff0' }}>First 3 IDs: {JSON.stringify(tradesDebug?.firstIds || [])}</div>
-          <div style={{ color: '#888' }}>First trade keys: {JSON.stringify(tradesDebug?.firstTrade || [])}</div>
+          <div style={{ color: '#e94560', fontWeight: 'bold', marginBottom: 8 }}>🔬 CRYPTO DIAGNOSTICS (Single Source of Truth)</div>
+          <div style={{ color: '#0f0' }}>API Status: {tradesDebug?.status || 'pending'}</div>
+          <div style={{ color: '#0f0' }}>Endpoint: {tradesDebug?.endpoint || 'N/A'}</div>
+          <div style={{ color: '#ff0' }}>trades.length (displayed): {trades.length}</div>
+          <div style={{ color: '#ff0' }}>summary.total_trades (all-time): {tradesDebug?.totalTrades ?? 'N/A'}</div>
+          <div style={{ color: '#ff0' }}>summary.daily_trades (today): {tradesDebug?.dailyTrades ?? 'N/A'}</div>
+          <div style={{ color: '#0ff' }}>summary.total_pnl: ${tradesDebug?.totalPnl?.toFixed(2) ?? 'N/A'}</div>
+          <div style={{ color: '#888' }}>first_trade_time: {tradesDebug?.firstTradeTime || 'N/A'}</div>
+          <div style={{ color: summary ? '#0f0' : '#f00' }}>Summary present: {tradesDebug?.summaryPresent ? 'YES' : 'NO'}</div>
           {tradesDebug?.error && <div style={{ color: '#f00' }}>Error: {tradesDebug.error}</div>}
         </div>
       )}
@@ -575,7 +608,7 @@ export function CryptoTab() {
 
       {/* P&L and Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <PnLCard pnl={pnl} />
+        <PnLCard summary={summary} />
 
         {/* Quick Stats */}
         <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
@@ -590,8 +623,8 @@ export function CryptoTab() {
               <span className="font-mono text-cyan-400">{status?.signals_today || 0}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Trades</span>
-              <span className="font-mono text-white">{status?.trades_today || trades.length}</span>
+              <span className="text-slate-400">Trades (Today)</span>
+              <span className="font-mono text-white">{summary?.daily_trades ?? 0}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Active Positions</span>
