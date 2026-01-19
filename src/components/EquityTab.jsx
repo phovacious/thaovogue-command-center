@@ -23,7 +23,49 @@ const EQUITY_AGENTS = [
   { key: 'bot_spx_recycler', name: 'SPX Recycler' },
 ];
 
-function AgentCard({ agent, running, onClick }) {
+const normalizeKey = (key) => (
+  typeof key === 'string'
+    ? key.toLowerCase().replace(/[-_]/g, '')
+    : ''
+);
+
+const getItemKey = (item) => (
+  item?.key || item?.agent_key || item?.name || item?.id || ''
+);
+
+const normalizeAgents = (agents) => {
+  if (Array.isArray(agents)) {
+    return agents.map((item) => ({ ...item, key: getItemKey(item) || item?.key }));
+  }
+  if (agents && typeof agents === 'object') {
+    return Object.entries(agents).map(([mapKey, value]) => ({
+      ...(value || {}),
+      key: getItemKey(value) || mapKey,
+    }));
+  }
+  return [];
+};
+
+const findStatusByKey = (list, key) => {
+  const agents = normalizeAgents(list);
+  if (agents.length === 0) return undefined;
+  const needle = normalizeKey(key);
+  if (!needle) return undefined;
+  return agents.find((item) => normalizeKey(getItemKey(item)) === needle);
+};
+
+const isAgentRunning = (status) => {
+  if (!status) return false;
+  return status.running === true
+    || status.running === 'true'
+    || status.running === 1
+    || status.status === 'RUNNING'
+    || status.status === 'running';
+};
+
+function AgentCard({ agent, status, onClick }) {
+  const running = isAgentRunning(status);
+  const statusLabel = status ? (running ? 'RUNNING' : 'STOPPED') : 'UNKNOWN';
   return (
     <button
       type="button"
@@ -37,7 +79,7 @@ function AgentCard({ agent, running, onClick }) {
         <span className={`px-2 py-0.5 rounded text-xs font-bold ${
           running ? 'bg-green-500/20 text-green-400' : 'bg-slate-600/20 text-slate-300'
         }`}>
-          {running ? 'RUNNING' : 'UNKNOWN'}
+          {statusLabel}
         </span>
       </div>
       <div className="text-xs text-slate-400">
@@ -47,9 +89,11 @@ function AgentCard({ agent, running, onClick }) {
   );
 }
 
-function EquityAgentModal({ agent, running, onClose }) {
+function EquityAgentModal({ agent, status, onClose }) {
   if (!agent) return null;
+  const running = isAgentRunning(status);
   const description = EQUITY_DESCRIPTIONS[agent.key] || 'Agent description pending.';
+  const statusLabel = status ? (running ? 'RUNNING' : 'STOPPED') : 'UNKNOWN';
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -69,7 +113,7 @@ function EquityAgentModal({ agent, running, onClose }) {
           <div className="bg-slate-700/50 rounded p-3 text-sm">
             <div className="text-xs text-slate-400">Status</div>
             <div className={`font-bold ${running ? 'text-green-400' : 'text-slate-300'}`}>
-              {running ? 'RUNNING' : 'UNKNOWN'}
+              {statusLabel}
             </div>
           </div>
         </div>
@@ -349,25 +393,94 @@ function BacktestResultsCard() {
 export function EquityTab() {
   const api = useApi();
   const [mmStatus, setMmStatus] = useState(null);
+  const [equityStatus, setEquityStatus] = useState(null);
+  const [dipSniperStatus, setDipSniperStatus] = useState(null);
+  const [dipSniperError, setDipSniperError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
+  const useMockStatus = import.meta.env?.VITE_USE_MOCK_STATUS === 'true';
 
-  const fetchData = async () => {
+  const getAgentStatus = (agent) => {
+    const directMatch = findStatusByKey(dipSniperStatus?.agents, agent.key)
+      || findStatusByKey(equityStatus?.agents, agent.key);
+    if (directMatch) return directMatch;
+    if (agent.key.startsWith('dip_sniper')) {
+      const agents = normalizeAgents(dipSniperStatus?.agents);
+      if (agents.length === 1) {
+        return { ...agents[0], _assumed_match: true };
+      }
+    }
+    if (agent.key === 'equity_alpha' && mmStatus?.status === 'ok') {
+      return { running: true };
+    }
+    return undefined;
+  };
+
+  const fetchData = async (signal) => {
+    const setIfActive = (setter, value) => {
+      if (!signal?.aborted) {
+        setter(value);
+      }
+    };
+
     try {
-      const data = await api.fetchApi('/api/equity/morning-momentum/status');
-      if (data.status === 'ok') {
-        setMmStatus(data);
+      if (useMockStatus) {
+        setIfActive(setDipSniperStatus, {
+          agents: [{ key: 'dip_sniper_fixed', running: true }],
+        });
+        setIfActive(setDipSniperError, null);
+        setIfActive(setLoading, false);
+        return;
+      }
+
+      let mmData;
+      let statusData;
+      try {
+        [mmData, statusData] = await Promise.all([
+          api.fetchApi('/api/equity/morning-momentum/status', { signal }),
+          api.fetchApi('/api/equity/status', { signal }),
+        ]);
+      } catch (e) {
+        console.error('Equity status fetch failed:', e);
+      }
+      if (mmData?.status === 'ok') {
+        setIfActive(setMmStatus, mmData);
+      }
+      if (statusData?.status) {
+        setIfActive(setEquityStatus, statusData);
+      }
+      try {
+        const dipStatus = await api.fetchApi('/api/dip-sniper/status', { signal });
+        console.log('[RAW DIP-SNIPER RESPONSE]', JSON.stringify(dipStatus, null, 2));
+        console.log('[RAW] typeof agents:', typeof dipStatus?.agents, 'isArray:', Array.isArray(dipStatus?.agents));
+        if (dipStatus) {
+          setIfActive(setDipSniperStatus, {
+            ...dipStatus,
+            agents: normalizeAgents(dipStatus.agents),
+          });
+          setIfActive(setDipSniperError, null);
+        }
+      } catch (e) {
+        setIfActive(setDipSniperError, e?.message || 'Dip sniper fetch failed');
+        console.error('Dip sniper status fetch failed:', e);
       }
     } catch (e) {
       console.error('Failed to fetch morning momentum status:', e);
     }
-    setLoading(false);
+    if (!signal?.aborted) {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    const interval = setInterval(() => fetchData(controller.signal), 30000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, []);
 
   const handleScan = async (type) => {
@@ -390,6 +503,23 @@ export function EquityTab() {
 
   return (
     <div className="px-4 space-y-6">
+      {debugStatus && (
+        <div className="bg-slate-800/70 border border-slate-700 rounded px-3 py-2 text-xs text-slate-300">
+          <div className="font-semibold mb-1">Status Debug</div>
+          <pre className="whitespace-pre-wrap break-words">
+            {JSON.stringify({
+              dipSniperStatus,
+              dipSniperError,
+              agentsIsArray: Array.isArray(dipSniperStatus?.agents),
+              agentsPreview: normalizeAgents(dipSniperStatus?.agents).slice(0, 3),
+              targetKey: 'dip_sniper_fixed',
+              matchedStatus: getAgentStatus({ key: 'dip_sniper_fixed' }),
+              normalizedTarget: normalizeKey('dip_sniper_fixed'),
+              normalizedFound: normalizeKey(getItemKey(getAgentStatus({ key: 'dip_sniper_fixed' }) || {})),
+            }, null, 2)}
+          </pre>
+        </div>
+      )}
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -413,7 +543,7 @@ export function EquityTab() {
             <AgentCard
               key={agent.key}
               agent={agent}
-              running={agent.key === 'equity_alpha' && mmStatus?.status === 'ok'}
+              status={getAgentStatus(agent)}
               onClick={() => setSelectedAgent(agent)}
             />
           ))}
@@ -458,7 +588,7 @@ export function EquityTab() {
       {selectedAgent && (
         <EquityAgentModal
           agent={selectedAgent}
-          running={selectedAgent.key === 'equity_alpha' && mmStatus?.status === 'ok'}
+          status={getAgentStatus(selectedAgent)}
           onClose={() => setSelectedAgent(null)}
         />
       )}
