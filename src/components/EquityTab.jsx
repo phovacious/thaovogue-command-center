@@ -16,11 +16,11 @@ const EQUITY_AGENTS = [
   { key: 'equity_alpha', name: 'Equity Alpha' },
   { key: 'equity_beta', name: 'Equity Beta' },
   { key: 'equity_gamma', name: 'Equity Gamma' },
-  { key: 'spx_canary', name: 'SPX Canary' },
-  { key: 'spx_beta', name: 'SPX Beta' },
-  { key: 'spx_charlie', name: 'SPX Charlie' },
-  { key: 'ultra_printer', name: 'Ultra Printer' },
-  { key: 'bot_spx_recycler', name: 'SPX Recycler' },
+  // { key: 'spx_canary', name: 'SPX Canary' },
+  // { key: 'spx_beta', name: 'SPX Beta' },
+  // { key: 'spx_charlie', name: 'SPX Charlie' },
+  // { key: 'ultra_printer', name: 'Ultra Printer' },
+  // { key: 'bot_spx_recycler', name: 'SPX Recycler' },
 ];
 
 const DIP_SNIPER_AGENTS = [
@@ -94,7 +94,7 @@ function AgentCard({ agent, status, onClick }) {
   );
 }
 
-function EquityAgentModal({ agent, status, onClose }) {
+function EquityAgentModal({ agent, status, trades, stats, loading, error, onClose }) {
   if (!agent) return null;
   const running = isAgentRunning(status);
   const description = EQUITY_DESCRIPTIONS[agent.key] || 'Agent description pending.';
@@ -120,6 +120,67 @@ function EquityAgentModal({ agent, status, onClose }) {
             <div className={`font-bold ${running ? 'text-green-400' : 'text-slate-300'}`}>
               {statusLabel}
             </div>
+          </div>
+          <div className="bg-slate-700/50 rounded p-3 text-sm">
+            <div className="text-xs text-slate-400 mb-2">Trade Stats</div>
+            {loading ? (
+              <div className="text-slate-400 text-xs">Loading trades…</div>
+            ) : error ? (
+              <div className="text-red-400 text-xs">{error}</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <div className="text-slate-400">Total Trades</div>
+                  <div className="text-white">{stats?.total_trades ?? 0}</div>
+                </div>
+                <div>
+                  <div className="text-slate-400">Win Rate</div>
+                  <div className="text-white">{stats?.win_rate ?? 0}%</div>
+                </div>
+                <div>
+                  <div className="text-slate-400">Total P&L</div>
+                  <div className="text-white">{stats?.total_pnl ?? 0}</div>
+                </div>
+                <div>
+                  <div className="text-slate-400">Avg Duration</div>
+                  <div className="text-white">{stats?.avg_duration ?? 0}m</div>
+                </div>
+                <div>
+                  <div className="text-slate-400">Best Day</div>
+                  <div className="text-white">
+                    {stats?.best_day ? `${stats.best_day.date} (${stats.best_day.pnl})` : '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-400">Worst Day</div>
+                  <div className="text-white">
+                    {stats?.worst_day ? `${stats.worst_day.date} (${stats.worst_day.pnl})` : '—'}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="bg-slate-700/50 rounded p-3 text-sm">
+            <div className="text-xs text-slate-400 mb-2">Recent Trades</div>
+            {loading ? (
+              <div className="text-slate-400 text-xs">Loading trades…</div>
+            ) : (trades?.length ?? 0) === 0 ? (
+              <div className="text-slate-400 text-xs">No trades logged.</div>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-auto">
+                {trades.map((trade, idx) => (
+                  <div key={idx} className="text-xs text-slate-200 border-b border-slate-600/40 pb-2">
+                    <div className="text-slate-400">
+                      {trade.symbol} • {trade.entry_time || '—'} → {trade.exit_time || '—'}
+                    </div>
+                    <div className="flex justify-between">
+                      <span>P&L: {trade.pnl ?? 0}</span>
+                      <span>{trade.exit_reason || '—'} • {trade.duration_minutes ?? 0}m</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -403,6 +464,10 @@ export function EquityTab() {
   const [dipSniperError, setDipSniperError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [botTrades, setBotTrades] = useState([]);
+  const [botStats, setBotStats] = useState(null);
+  const [botTradesLoading, setBotTradesLoading] = useState(false);
+  const [botTradesError, setBotTradesError] = useState(null);
   const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
   const useMockStatus = import.meta.env?.VITE_USE_MOCK_STATUS === 'true';
 
@@ -499,6 +564,36 @@ export function EquityTab() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const loadTrades = async () => {
+      if (!selectedAgent) {
+        setBotTrades([]);
+        setBotStats(null);
+        setBotTradesError(null);
+        setBotTradesLoading(false);
+        return;
+      }
+      setBotTradesLoading(true);
+      setBotTradesError(null);
+      try {
+        const data = await api.fetchApi(`/api/bot/${selectedAgent.key}/trades?limit=50`);
+        if (!active) return;
+        setBotTrades(data.trades || []);
+        setBotStats(data.stats || null);
+      } catch (e) {
+        if (!active) return;
+        setBotTradesError(e.message || 'Failed to load trades');
+      } finally {
+        if (active) setBotTradesLoading(false);
+      }
+    };
+    loadTrades();
+    return () => {
+      active = false;
+    };
+  }, [api, selectedAgent]);
+
   const handleScan = async (type) => {
     try {
       await api.fetchApi(`/api/equity/morning-momentum/scan?scan_type=${type}`, { method: 'POST' });
@@ -552,23 +647,7 @@ export function EquityTab() {
       {/* Morning Momentum Card */}
       <MorningMomentumCard data={mmStatus} onScan={handleScan} />
 
-      {/* Agent Grid */}
-      <section>
-        <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-          <span>🤖</span> Equity Agents
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {EQUITY_AGENTS.map((agent) => (
-            <AgentCard
-              key={agent.key}
-              agent={agent}
-              status={getAgentStatus(agent)}
-              onClick={() => setSelectedAgent(agent)}
-            />
-          ))}
-        </div>
-      </section>
-
+      {/* Dip Sniper Bots */}
       <section>
         <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
           <span>🎯</span> Dip Sniper Bots
@@ -586,6 +665,33 @@ export function EquityTab() {
           ))}
         </div>
       </section>
+
+      {/* Equity Agents (only when active) */}
+      {EQUITY_AGENTS.filter((agent) => {
+        if (!['equity_alpha', 'equity_beta', 'equity_gamma'].includes(agent.key)) {
+          return false;
+        }
+        return getAgentStatus(agent)?.running;
+      }).length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+            <span>🤖</span> Equity Agents
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {EQUITY_AGENTS.filter((agent) => (
+              ['equity_alpha', 'equity_beta', 'equity_gamma'].includes(agent.key)
+              && getAgentStatus(agent)?.running
+            )).map((agent) => (
+              <AgentCard
+                key={agent.key}
+                agent={agent}
+                status={getAgentStatus(agent)}
+                onClick={() => setSelectedAgent(agent)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Grid: Strategy Params + Backtest Results */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -630,6 +736,10 @@ export function EquityTab() {
               ? dipSniperStatus.agents.find((item) => item?.key === selectedAgent.key)
               : undefined)
             : getAgentStatus(selectedAgent)}
+          trades={botTrades}
+          stats={botStats}
+          loading={botTradesLoading}
+          error={botTradesError}
           onClose={() => setSelectedAgent(null)}
         />
       )}
