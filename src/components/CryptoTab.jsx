@@ -98,29 +98,38 @@ function EventCard({ event }) {
 
 // Trade Card
 function TradeCard({ trade }) {
-  const isWin = trade.win || trade.pnl > 0;
+  const pnl = trade.pnl ?? 0;
+  const isWin = trade.win || pnl > 0;
+  const size = trade.size ?? trade.size_usd ?? 0;
+  const pnlPct = trade.pnl_pct ?? 0;
+  const action = trade.action || trade.side || '';
 
   return (
     <div className={`p-3 rounded-lg border ${isWin ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
       <div className="flex justify-between items-start mb-2">
         <div>
           <span className="font-mono font-bold text-white">{trade.pair || trade.symbol}</span>
-          <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${isWin ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+          {action && (
+            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${action === 'LONG' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-orange-500/20 text-orange-400'}`}>
+              {action}
+            </span>
+          )}
+          <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${isWin ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
             {isWin ? 'WIN' : 'LOSS'}
           </span>
         </div>
         <span className={`font-mono font-bold ${isWin ? 'text-green-400' : 'text-red-400'}`}>
-          {trade.pnl >= 0 ? '+' : ''}${trade.pnl?.toFixed(2)}
+          {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
         <div>Entry: ${trade.entry_price?.toFixed(4)}</div>
         <div>Exit: ${trade.exit_price?.toFixed(4)}</div>
-        <div>Size: ${trade.size?.toFixed(2)}</div>
-        <div>P&L: {(trade.pnl_pct * 100)?.toFixed(2)}%</div>
+        <div>Size: ${size.toFixed(2)}</div>
+        <div>P&L: {(pnlPct * 100).toFixed(2)}%</div>
       </div>
       <div className="text-xs text-slate-500 mt-2">
-        {trade.exit_reason} • {new Date(trade.exit_time).toLocaleString()}
+        {trade.exit_reason} • {trade.exit_time ? new Date(trade.exit_time).toLocaleString() : 'N/A'}
       </div>
     </div>
   );
@@ -267,6 +276,8 @@ export function CryptoTab() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [eventsUpdatedAt, setEventsUpdatedAt] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [tradesDebug, setTradesDebug] = useState(null);
+  const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
 
   const fetchData = async () => {
     try {
@@ -298,7 +309,16 @@ export function CryptoTab() {
       }
 
       if (tradesResult.status === 'fulfilled') {
-        setTrades(tradesResult.value?.trades || []);
+        const tradesData = tradesResult.value?.trades || [];
+        setTrades(tradesData);
+        setTradesDebug({
+          status: 'ok',
+          count: tradesData.length,
+          firstIds: tradesData.slice(0, 3).map((t) => t.id),
+          firstTrade: tradesData[0] ? Object.keys(tradesData[0]) : [],
+        });
+      } else {
+        setTradesDebug({ status: 'failed', error: tradesResult.reason?.message });
       }
 
       if (pnlResult.status === 'fulfilled') {
@@ -372,6 +392,17 @@ export function CryptoTab() {
 
   return (
     <div className="px-4 space-y-6">
+      {/* Diagnostics Panel - gated behind VITE_DEBUG_STATUS */}
+      {debugStatus && (
+        <div style={{ background: '#1a1a2e', border: '2px solid #e94560', borderRadius: 8, padding: 12, fontSize: 11, fontFamily: 'monospace' }}>
+          <div style={{ color: '#e94560', fontWeight: 'bold', marginBottom: 8 }}>🔬 CRYPTO DIAGNOSTICS</div>
+          <div style={{ color: '#0f0' }}>Trades API: {tradesDebug?.status || 'pending'}</div>
+          <div style={{ color: '#ff0' }}>trades.length: {trades.length}</div>
+          <div style={{ color: '#ff0' }}>First 3 IDs: {JSON.stringify(tradesDebug?.firstIds || [])}</div>
+          <div style={{ color: '#888' }}>First trade keys: {JSON.stringify(tradesDebug?.firstTrade || [])}</div>
+          {tradesDebug?.error && <div style={{ color: '#f00' }}>Error: {tradesDebug.error}</div>}
+        </div>
+      )}
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
