@@ -666,32 +666,24 @@ export function EquityTab() {
         </div>
       </section>
 
-      {/* Equity Agents (only when active) */}
-      {EQUITY_AGENTS.filter((agent) => {
-        if (!['equity_alpha', 'equity_beta', 'equity_gamma'].includes(agent.key)) {
-          return false;
-        }
-        return getAgentStatus(agent)?.running;
-      }).length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-            <span>🤖</span> Equity Agents
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {EQUITY_AGENTS.filter((agent) => (
-              ['equity_alpha', 'equity_beta', 'equity_gamma'].includes(agent.key)
-              && getAgentStatus(agent)?.running
-            )).map((agent) => (
-              <AgentCard
-                key={agent.key}
-                agent={agent}
-                status={getAgentStatus(agent)}
-                onClick={() => setSelectedAgent(agent)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Equity Agents */}
+      <section>
+        <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+          <span>🤖</span> Equity Agents
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {EQUITY_AGENTS.filter((agent) => (
+            ['equity_alpha', 'equity_beta', 'equity_gamma'].includes(agent.key)
+          )).map((agent) => (
+            <AgentCard
+              key={agent.key}
+              agent={agent}
+              status={getAgentStatus(agent)}
+              onClick={() => setSelectedAgent(agent)}
+            />
+          ))}
+        </div>
+      </section>
 
       {/* Grid: Strategy Params + Backtest Results */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
