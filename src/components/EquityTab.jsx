@@ -476,21 +476,9 @@ export function EquityTab() {
     return Object.fromEntries(list.map((agent) => [agent?.key, agent]));
   }, [dipSniperStatus]);
 
-  const getAgentStatus = (agent) => {
-    const directMatch = findStatusByKey(dipSniperStatus?.agents, agent.key)
-      || findStatusByKey(equityStatus?.agents, agent.key);
-    if (directMatch) return directMatch;
-    if (agent.key.startsWith('dip_sniper')) {
-      const agents = normalizeAgents(dipSniperStatus?.agents);
-      if (agents.length === 1) {
-        return { ...agents[0], _assumed_match: true };
-      }
-    }
-    if (agent.key === 'equity_alpha' && mmStatus?.status === 'ok') {
-      return { running: true };
-    }
-    return undefined;
-  };
+  const getAgentStatus = (agent) => (
+    findStatusByKey(equityStatus?.agents, agent.key)
+  );
 
   useEffect(() => {
     if (debugStatus && dipSniperStatus) {
@@ -528,8 +516,11 @@ export function EquityTab() {
       if (mmData?.status === 'ok') {
         setIfActive(setMmStatus, mmData);
       }
-      if (statusData?.status) {
-        setIfActive(setEquityStatus, statusData);
+      if (statusData) {
+        setIfActive(setEquityStatus, {
+          ...statusData,
+          agents: normalizeAgents(statusData.agents),
+        });
       }
       try {
         const dipStatus = await api.fetchApi('/api/dip-sniper/status', { signal });
