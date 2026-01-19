@@ -98,7 +98,7 @@ function EventCard({ event }) {
 
 // Trade Card
 function TradeCard({ trade, onClick }) {
-  const pnl = trade.pnl ?? 0;
+  const pnl = trade.pnl_dollars ?? trade.pnl ?? 0;
   const isWin = trade.win || pnl > 0;
   const size = trade.size ?? trade.size_usd ?? 0;
   const pnlPct = trade.pnl_pct ?? 0;
@@ -141,18 +141,45 @@ function TradeCard({ trade, onClick }) {
 
 // Trade Detail Modal
 function TradeDetailModal({ trade, onClose }) {
-  if (!trade) return null;
-
-  const pnl = trade.pnl ?? 0;
-  const isWin = trade.win || pnl > 0;
-  const size = trade.size ?? trade.size_usd ?? 0;
-  const pnlPct = trade.pnl_pct ?? 0;
-  const action = trade.action || trade.side || '';
-  const entryTime = trade.entry_time ? new Date(trade.entry_time) : null;
-  const exitTime = trade.exit_time ? new Date(trade.exit_time) : null;
+  const safeTrade = trade || {};
+  const pnl = safeTrade.pnl_dollars ?? safeTrade.pnl ?? 0;
+  const isWin = safeTrade.win || pnl > 0;
+  const size = safeTrade.size ?? safeTrade.size_usd ?? 0;
+  const pnlPct = safeTrade.pnl_pct ?? 0;
+  const action = safeTrade.action || safeTrade.side || '';
+  const entryTime = safeTrade.entry_time ? new Date(safeTrade.entry_time) : null;
+  const exitTime = safeTrade.exit_time ? new Date(safeTrade.exit_time) : null;
   const durationLabel = entryTime && exitTime
     ? formatDuration(exitTime.getTime() - entryTime.getTime())
     : '—';
+  const tradeId = safeTrade.trade_id || safeTrade.id || safeTrade.order_id;
+  const noteKeyBase = tradeId || `${safeTrade.symbol || safeTrade.pair || 'trade'}:${safeTrade.exit_time || safeTrade.entry_time || ''}`;
+  const noteStorageKey = `crypto_trade_note:${noteKeyBase}`;
+  const [note, setNote] = useState('');
+  const [noteStatus, setNoteStatus] = useState('saved');
+
+  useEffect(() => {
+    if (!trade) return;
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem(noteStorageKey);
+    setNote(stored || '');
+    setNoteStatus('saved');
+  }, [noteStorageKey, trade]);
+
+  const handleSaveNote = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(noteStorageKey, note);
+    setNoteStatus('saved');
+  };
+
+  const stopPrice = safeTrade.stop_price;
+  const entryPrice = safeTrade.entry_price;
+  const riskDollars = entryPrice && stopPrice && size
+    ? (Math.abs(entryPrice - stopPrice) / entryPrice) * size
+    : null;
+  const rMultiple = riskDollars && riskDollars > 0 ? pnl / riskDollars : null;
+
+  if (!trade) return null;
 
   return (
     <div
@@ -213,7 +240,7 @@ function TradeDetailModal({ trade, onClose }) {
               </div>
               <div>
                 <div className="text-slate-400">Trade ID</div>
-                <div className="text-white font-mono text-xs">{trade.id || 'N/A'}</div>
+                <div className="text-white font-mono text-xs">{tradeId || 'N/A'}</div>
               </div>
             </div>
           </div>
@@ -232,6 +259,57 @@ function TradeDetailModal({ trade, onClose }) {
                 <div className="text-slate-400">Hold Duration</div>
                 <div className="text-white text-xs">{durationLabel}</div>
               </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-700 pt-3">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="text-slate-400">Stop Price</div>
+                <div className="text-white text-xs">
+                  {stopPrice ? `$${Number(stopPrice).toFixed(4)}` : '—'}
+                </div>
+              </div>
+              <div>
+                <div className="text-slate-400">Risk (USD)</div>
+                <div className="text-white text-xs">
+                  {riskDollars ? `$${riskDollars.toFixed(2)}` : 'n/a'}
+                </div>
+              </div>
+              <div>
+                <div className="text-slate-400">R Multiple</div>
+                <div className="text-white text-xs">
+                  {rMultiple !== null ? `${rMultiple.toFixed(2)}R` : 'n/a'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-700 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm text-slate-400">Journal Notes</div>
+              <div className="text-xs text-slate-500">
+                {noteStatus === 'saved' ? 'Saved' : 'Unsaved'}
+              </div>
+            </div>
+            <textarea
+              className="w-full bg-slate-900/60 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-cyan-500/40"
+              rows={3}
+              value={note}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setNoteStatus('unsaved');
+              }}
+              placeholder="Add a quick note about this trade..."
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={handleSaveNote}
+                className="text-xs px-3 py-1 rounded bg-slate-700 text-slate-200 hover:bg-slate-600"
+              >
+                Save Note
+              </button>
             </div>
           </div>
 
@@ -269,35 +347,105 @@ function formatTimeEt(value) {
   return dt.toLocaleString('en-US', { timeZone: 'America/New_York' });
 }
 
-function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
-  const today = summary?.today_date || new Date().toISOString().slice(0, 10);
-  const todaysTrades = trades.filter((trade) => (trade.exit_time || '').startsWith(today));
-  const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
-  const [lastTappedTradeId, setLastTappedTradeId] = useState(null);
+function getEtDate(value) {
+  if (!value) return null;
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
+
+function PerSymbolTable({ rows }) {
+  if (!rows || rows.length === 0) {
+    return <div className="text-xs text-slate-500">No data available.</div>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs text-slate-300 border-collapse">
+        <thead>
+          <tr className="text-slate-500">
+            <th className="text-left py-1">Symbol</th>
+            <th className="text-right py-1">Trades</th>
+            <th className="text-right py-1">Wins</th>
+            <th className="text-right py-1">Losses</th>
+            <th className="text-right py-1">Win Rate</th>
+            <th className="text-right py-1">P&L</th>
+            <th className="text-right py-1">Avg/Trade</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.symbol} className="border-t border-slate-700/50">
+              <td className="py-1 font-mono text-white">{row.symbol}</td>
+              <td className="py-1 text-right">{row.trades}</td>
+              <td className="py-1 text-right text-green-400">{row.wins}</td>
+              <td className="py-1 text-right text-red-400">{row.losses}</td>
+              <td className="py-1 text-right">{(row.win_rate * 100).toFixed(1)}%</td>
+              <td className={`py-1 text-right ${row.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {row.total_pnl >= 0 ? '+' : '-'}${Math.abs(row.total_pnl ?? 0).toFixed(2)}
+              </td>
+              <td className="py-1 text-right">${(row.avg_pnl ?? 0).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TodaySummaryModal({ status, summaryToday, perSymbolToday, sessionToday, trades, onSelectTrade, onClose }) {
+  const today = summaryToday?.today_date || getEtDate(new Date()) || new Date().toISOString().slice(0, 10);
+  const todaysTrades = trades.filter((trade) => getEtDate(trade.exit_time) === today);
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-40 p-4" onClick={onClose}>
-      <div className="bg-slate-800 rounded-lg p-6 max-w-3xl w-full border border-slate-600" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-slate-800 rounded-lg p-6 max-w-4xl w-full border border-slate-600 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h2 className="text-xl font-bold text-white">Today's Activity</h2>
+            <h2 className="text-xl font-bold text-white">Today Summary</h2>
             <div className="text-sm text-slate-400">{today}</div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-6">
           <div>
-            <div className="text-slate-400">Scans</div>
-            <div className="text-white font-mono">{status?.scans_today ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-slate-400">Signals</div>
-            <div className="text-cyan-400 font-mono">{status?.signals_today ?? 0}</div>
+            <div className="text-slate-400">Today P&L</div>
+            <div className={`font-mono text-lg ${summaryToday?.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {summaryToday?.total_pnl >= 0 ? '+' : '-'}${Math.abs(summaryToday?.total_pnl ?? 0).toFixed(2)}
+            </div>
           </div>
           <div>
             <div className="text-slate-400">Trades</div>
-            <div className="text-white font-mono">{summary?.daily_trades ?? 0}</div>
+            <div className="text-white font-mono text-lg">{summaryToday?.total_trades ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Wins / Losses</div>
+            <div className="text-white font-mono">
+              <span className="text-green-400">{summaryToday?.wins ?? 0}</span>
+              <span className="text-slate-500"> / </span>
+              <span className="text-red-400">{summaryToday?.losses ?? 0}</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-slate-400">Win Rate</div>
+            <div className="text-cyan-400 font-mono text-lg">
+              {(summaryToday?.win_rate ? summaryToday.win_rate * 100 : 0).toFixed(1)}%
+            </div>
+          </div>
+          <div>
+            <div className="text-slate-400">Avg Win</div>
+            <div className="text-green-400 font-mono">+${(summaryToday?.avg_win ?? 0).toFixed(2)}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Avg Loss</div>
+            <div className="text-red-400 font-mono">${(summaryToday?.avg_loss ?? 0).toFixed(2)}</div>
+          </div>
+          <div>
+            <div className="text-slate-400">Profit Factor</div>
+            <div className="text-white font-mono">
+              {summaryToday?.profit_factor === Infinity ? '∞' : (summaryToday?.profit_factor ?? 0).toFixed(2)}
+            </div>
           </div>
           <div>
             <div className="text-slate-400">Active Positions</div>
@@ -305,22 +453,45 @@ function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
-          <div>
-            <div className="text-slate-400">Today P&L</div>
-            <div className="text-white font-mono">{summary?.daily_pnl ?? 0}</div>
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-2">Today by Symbol</h3>
+          <PerSymbolTable rows={[...(perSymbolToday || [])].sort((a, b) => b.total_pnl - a.total_pnl)} />
+        </div>
+
+        <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-slate-700/40 rounded p-3">
+            <div className="text-xs text-slate-400 mb-2">Sessions</div>
+            {sessionToday?.sessions?.length ? (
+              <div className="space-y-2 text-xs text-slate-200">
+                {sessionToday.sessions.map((session) => (
+                  <div key={session.session} className="flex justify-between">
+                    <span className="capitalize">{session.session.replace(/_/g, ' ')}</span>
+                    <span>
+                      {session.trades} trades • {session.wins}/{session.losses} • {session.total_pnl >= 0 ? '+' : '-'}${Math.abs(session.total_pnl).toFixed(2)} • {formatDuration((session.avg_duration_seconds || 0) * 1000)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500">No session data yet.</div>
+            )}
           </div>
-          <div>
-            <div className="text-slate-400">Wins</div>
-            <div className="text-green-400 font-mono">{summary?.daily_wins ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-slate-400">Losses</div>
-            <div className="text-red-400 font-mono">{summary?.daily_losses ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-slate-400">Trades</div>
-            <div className="text-white font-mono">{summary?.daily_trades ?? 0}</div>
+          <div className="bg-slate-700/40 rounded p-3">
+            <div className="text-xs text-slate-400 mb-2">By Exit Reason</div>
+            {sessionToday?.by_reason?.length ? (
+              <div className="space-y-2 text-xs text-slate-200">
+                {sessionToday.by_reason.map((reason) => (
+                  <div key={reason.reason} className="flex justify-between">
+                    <span className="capitalize">{reason.reason.replace(/_/g, ' ')}</span>
+                    <span>
+                      {reason.trades} trades • {reason.wins}/{reason.losses} • {reason.total_pnl >= 0 ? '+' : '-'}${Math.abs(reason.total_pnl).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500">No exit data yet.</div>
+            )}
           </div>
         </div>
 
@@ -332,24 +503,18 @@ function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
             <div className="space-y-2 max-h-72 overflow-auto pointer-events-auto">
               {todaysTrades.map((trade, idx) => (
                 <button
-                  key={idx}
+                  key={trade.trade_id || trade.id || idx}
                   type="button"
-                  onPointerUp={() => {
-                    setLastTappedTradeId(trade.id || trade.symbol || trade.pair || String(idx));
-                    onSelectTrade(trade);
-                  }}
-                  onClick={() => {
-                    setLastTappedTradeId(trade.id || trade.symbol || trade.pair || String(idx));
-                    onSelectTrade(trade);
-                  }}
+                  onPointerUp={() => onSelectTrade(trade)}
+                  onClick={() => onSelectTrade(trade)}
                   aria-label={`Open trade ${trade.symbol || trade.pair || 'trade'}`}
                   className="w-full text-left cursor-pointer text-xs text-slate-200 border-b border-slate-600/40 pb-2 hover:text-white hover:bg-slate-700/40 active:bg-slate-700/50 rounded px-2 py-1 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-400/40 pointer-events-auto"
                 >
                   <div className="text-slate-400">
-                    {trade.symbol || trade.pair} • {trade.entry_time || '—'} → {trade.exit_time || '—'}
+                    {trade.symbol || trade.pair} • {formatTimeEt(trade.entry_time)} → {formatTimeEt(trade.exit_time)}
                   </div>
                   <div className="flex justify-between">
-                    <span>P&L: {trade.pnl ?? 0}</span>
+                    <span>P&L: {trade.pnl_dollars ?? trade.pnl ?? 0}</span>
                     <span>{trade.exit_reason || '—'}</span>
                   </div>
                 </button>
@@ -357,26 +522,20 @@ function ActivityModal({ status, summary, trades, onSelectTrade, onClose }) {
             </div>
           )}
         </div>
-        {debugStatus && (
-          <div className="mt-3 text-xs text-slate-400">
-            Last tapped: {lastTappedTradeId ?? '—'}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-// P&L Summary Card - uses summary from unified trades endpoint
-function PnLCard({ summary, onClick }) {
-  const totalPnl = summary?.total_pnl ?? 0;
-  const dailyPnl = summary?.daily_pnl ?? 0;
+// All-Time Summary Card
+function PnLCard({ summaryAll, summaryToday, firstTradeTime, onClick }) {
+  const totalPnl = summaryAll?.total_pnl ?? 0;
+  const dailyPnl = summaryToday?.total_pnl ?? 0;
   const isPositive = totalPnl >= 0;
   const isDailyPositive = dailyPnl >= 0;
 
-  // Format first trade date for context
-  const firstTradeDate = summary?.first_trade_time
-    ? new Date(summary.first_trade_time).toLocaleDateString()
+  const firstTradeDate = firstTradeTime
+    ? new Date(firstTradeTime).toLocaleDateString()
     : null;
 
   return (
@@ -386,7 +545,7 @@ function PnLCard({ summary, onClick }) {
       className="bg-slate-800 rounded-lg p-4 border border-slate-700 w-full text-left transition-colors cursor-pointer hover:border-cyan-500/60 hover:bg-slate-800/80"
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-bold text-white">💰 Crypto P&L</h3>
+        <h3 className="text-lg font-bold text-white">📘 All-Time Summary</h3>
         <div className="flex items-center gap-2">
           {firstTradeDate && (
             <span className="text-xs text-slate-500">Since {firstTradeDate}</span>
@@ -402,7 +561,7 @@ function PnLCard({ summary, onClick }) {
           </div>
         </div>
         <div>
-          <div className="text-sm text-slate-400">Today ({summary?.today_date || 'N/A'})</div>
+          <div className="text-sm text-slate-400">Today ({summaryToday?.today_date || 'N/A'})</div>
           <div className={`text-2xl font-mono font-bold ${isDailyPositive ? 'text-green-400' : 'text-red-400'}`}>
             {isDailyPositive ? '+' : '-'}${Math.abs(dailyPnl).toFixed(2)}
           </div>
@@ -410,26 +569,26 @@ function PnLCard({ summary, onClick }) {
         <div>
           <div className="text-sm text-slate-400">Win Rate</div>
           <div className="text-xl font-mono font-bold text-cyan-400">
-            {summary?.win_rate ? (summary.win_rate * 100).toFixed(1) : '0'}%
+            {summaryAll?.win_rate ? (summaryAll.win_rate * 100).toFixed(1) : '0'}%
           </div>
         </div>
         <div>
           <div className="text-sm text-slate-400">Trades (All / Today)</div>
           <div className="text-lg font-mono text-white">
-            {summary?.total_trades ?? 0}
+            {summaryAll?.total_trades ?? 0}
             <span className="text-slate-500"> / </span>
-            <span className="text-cyan-400">{summary?.daily_trades ?? 0}</span>
+            <span className="text-cyan-400">{summaryToday?.total_trades ?? 0}</span>
           </div>
         </div>
         <div className="col-span-2">
           <div className="text-sm text-slate-400">Wins / Losses</div>
           <div className="text-lg font-mono">
-            <span className="text-green-400">{summary?.wins ?? 0}</span>
+            <span className="text-green-400">{summaryAll?.wins ?? 0}</span>
             <span className="text-slate-500"> / </span>
-            <span className="text-red-400">{summary?.losses ?? 0}</span>
+            <span className="text-red-400">{summaryAll?.losses ?? 0}</span>
             <span className="text-slate-500 text-sm ml-2">
-              (today: <span className="text-green-400">{summary?.daily_wins ?? 0}</span>
-              /<span className="text-red-400">{summary?.daily_losses ?? 0}</span>)
+              (today: <span className="text-green-400">{summaryToday?.wins ?? 0}</span>
+              /<span className="text-red-400">{summaryToday?.losses ?? 0}</span>)
             </span>
           </div>
         </div>
@@ -438,55 +597,72 @@ function PnLCard({ summary, onClick }) {
   );
 }
 
-// Crypto Performance Modal - detailed P&L drill-down
-function CryptoPnlModal({ summary, trades, onClose, debugStatus }) {
-  if (!summary) return null;
-
-  // Compute derived stats from trades array
-  const derivedStats = trades.reduce(
-    (acc, trade) => {
-      const pnl = parseFloat(trade.pnl) || 0;
-      if (pnl > 0) {
-        acc.winPnls.push(pnl);
-        if (pnl > acc.largestWin) acc.largestWin = pnl;
-      } else if (pnl < 0) {
-        acc.lossPnls.push(pnl);
-        if (pnl < acc.largestLoss) acc.largestLoss = pnl;
-      }
-      return acc;
-    },
-    { winPnls: [], lossPnls: [], largestWin: 0, largestLoss: 0 }
-  );
-
-  const avgWin = derivedStats.winPnls.length > 0
-    ? derivedStats.winPnls.reduce((a, b) => a + b, 0) / derivedStats.winPnls.length
-    : 0;
-  const avgLoss = derivedStats.lossPnls.length > 0
-    ? derivedStats.lossPnls.reduce((a, b) => a + b, 0) / derivedStats.lossPnls.length
-    : 0;
-  const totalWinPnl = derivedStats.winPnls.reduce((a, b) => a + b, 0);
-  const totalLossPnl = Math.abs(derivedStats.lossPnls.reduce((a, b) => a + b, 0));
-  const profitFactor = totalLossPnl > 0 ? totalWinPnl / totalLossPnl : totalWinPnl > 0 ? Infinity : 0;
-
-  // Debug logging
-  if (debugStatus) {
-    console.log('[CryptoPnlModal] Derived stats:', {
-      tradesCount: trades.length,
-      avgWin,
-      avgLoss,
-      largestWin: derivedStats.largestWin,
-      largestLoss: derivedStats.largestLoss,
-      profitFactor,
-      summary,
-    });
-  }
-
-  const totalPnl = summary.total_pnl ?? 0;
-  const dailyPnl = summary.daily_pnl ?? 0;
-  const isPositive = totalPnl >= 0;
+function TodaySummaryCard({ summaryToday, onClick }) {
+  const dailyPnl = summaryToday?.total_pnl ?? 0;
   const isDailyPositive = dailyPnl >= 0;
-  const firstTradeDate = summary.first_trade_time
-    ? new Date(summary.first_trade_time).toLocaleString()
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="bg-slate-800 rounded-lg p-4 border border-slate-700 w-full text-left transition-colors cursor-pointer hover:border-cyan-500/60 hover:bg-slate-800/80"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-bold text-white">📊 Today Summary</h3>
+        <span className="text-xs text-slate-400">tap for details</span>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="text-sm text-slate-400">Today P&L</div>
+          <div className={`text-2xl font-mono font-bold ${isDailyPositive ? 'text-green-400' : 'text-red-400'}`}>
+            {isDailyPositive ? '+' : '-'}${Math.abs(dailyPnl).toFixed(2)}
+          </div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Trades</div>
+          <div className="text-xl font-mono text-white">{summaryToday?.total_trades ?? 0}</div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Wins / Losses</div>
+          <div className="text-lg font-mono">
+            <span className="text-green-400">{summaryToday?.wins ?? 0}</span>
+            <span className="text-slate-500"> / </span>
+            <span className="text-red-400">{summaryToday?.losses ?? 0}</span>
+          </div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Win Rate</div>
+          <div className="text-xl font-mono text-cyan-400">
+            {(summaryToday?.win_rate ? summaryToday.win_rate * 100 : 0).toFixed(1)}%
+          </div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Avg Win</div>
+          <div className="text-lg font-mono text-green-400">+${(summaryToday?.avg_win ?? 0).toFixed(2)}</div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Avg Loss</div>
+          <div className="text-lg font-mono text-red-400">${(summaryToday?.avg_loss ?? 0).toFixed(2)}</div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Profit Factor</div>
+          <div className="text-xl font-mono text-white">
+            {summaryToday?.profit_factor === Infinity ? '∞' : (summaryToday?.profit_factor ?? 0).toFixed(2)}
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// Crypto Performance Modal - detailed P&L drill-down
+function CryptoPnlModal({ summaryAll, summaryToday, perSymbolAll, firstTradeTime, onClose }) {
+  if (!summaryAll) return null;
+
+  const totalPnl = summaryAll.total_pnl ?? 0;
+  const isPositive = totalPnl >= 0;
+  const firstTradeDate = firstTradeTime
+    ? new Date(firstTradeTime).toLocaleString()
     : 'N/A';
 
   return (
@@ -500,7 +676,7 @@ function CryptoPnlModal({ summary, trades, onClose, debugStatus }) {
       >
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h2 className="text-xl font-bold text-white">Crypto Performance</h2>
+            <h2 className="text-xl font-bold text-white">All-Time Performance</h2>
             <p className="text-sm text-slate-400">Since {firstTradeDate}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
@@ -519,81 +695,53 @@ function CryptoPnlModal({ summary, trades, onClose, debugStatus }) {
             <div>
               <div className="text-sm text-slate-400">Win Rate</div>
               <div className="text-2xl font-mono font-bold text-cyan-400">
-                {summary.win_rate ? (summary.win_rate * 100).toFixed(1) : '0'}%
+                {summaryAll.win_rate ? (summaryAll.win_rate * 100).toFixed(1) : '0'}%
               </div>
             </div>
             <div>
               <div className="text-sm text-slate-400">Total Trades</div>
-              <div className="text-lg font-mono text-white">{summary.total_trades ?? 0}</div>
+              <div className="text-lg font-mono text-white">{summaryAll.total_trades ?? 0}</div>
             </div>
             <div>
               <div className="text-sm text-slate-400">Wins / Losses</div>
               <div className="text-lg font-mono">
-                <span className="text-green-400">{summary.wins ?? 0}</span>
+                <span className="text-green-400">{summaryAll.wins ?? 0}</span>
                 <span className="text-slate-500"> / </span>
-                <span className="text-red-400">{summary.losses ?? 0}</span>
+                <span className="text-red-400">{summaryAll.losses ?? 0}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Today Summary */}
         <div className="mb-6 border-t border-slate-700 pt-4">
           <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">
-            Today ({summary.today_date || 'N/A'})
+            Today ({summaryToday?.today_date || 'N/A'})
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-sm text-slate-400">Daily P&L</div>
-              <div className={`text-xl font-mono font-bold ${isDailyPositive ? 'text-green-400' : 'text-red-400'}`}>
-                {isDailyPositive ? '+' : '-'}${Math.abs(dailyPnl).toFixed(2)}
+              <div className={`text-xl font-mono font-bold ${summaryToday?.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {summaryToday?.total_pnl >= 0 ? '+' : '-'}${Math.abs(summaryToday?.total_pnl ?? 0).toFixed(2)}
               </div>
             </div>
             <div>
               <div className="text-sm text-slate-400">Daily Trades</div>
-              <div className="text-lg font-mono text-white">{summary.daily_trades ?? 0}</div>
+              <div className="text-lg font-mono text-white">{summaryToday?.total_trades ?? 0}</div>
             </div>
             <div className="col-span-2">
               <div className="text-sm text-slate-400">Daily Wins / Losses</div>
               <div className="text-lg font-mono">
-                <span className="text-green-400">{summary.daily_wins ?? 0}</span>
+                <span className="text-green-400">{summaryToday?.wins ?? 0}</span>
                 <span className="text-slate-500"> / </span>
-                <span className="text-red-400">{summary.daily_losses ?? 0}</span>
+                <span className="text-red-400">{summaryToday?.losses ?? 0}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Derived Stats */}
         <div className="border-t border-slate-700 pt-4">
-          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">Performance Metrics</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-slate-400">Avg Win</div>
-              <div className="text-lg font-mono text-green-400">+${avgWin.toFixed(2)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-slate-400">Avg Loss</div>
-              <div className="text-lg font-mono text-red-400">${avgLoss.toFixed(2)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-slate-400">Largest Win</div>
-              <div className="text-lg font-mono text-green-400">+${derivedStats.largestWin.toFixed(2)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-slate-400">Largest Loss</div>
-              <div className="text-lg font-mono text-red-400">${derivedStats.largestLoss.toFixed(2)}</div>
-            </div>
-            <div className="col-span-2">
-              <div className="text-sm text-slate-400">Profit Factor</div>
-              <div className={`text-xl font-mono font-bold ${profitFactor >= 1 ? 'text-green-400' : 'text-red-400'}`}>
-                {profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)}
-                <span className="text-sm text-slate-500 ml-2">
-                  (sum wins / sum losses)
-                </span>
-              </div>
-            </div>
-          </div>
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">Per-Symbol (All-Time)</h3>
+          <PerSymbolTable rows={[...(perSymbolAll || [])].sort((a, b) => b.total_pnl - a.total_pnl)} />
         </div>
       </div>
     </div>
@@ -697,7 +845,13 @@ export function CryptoTab() {
   const [status, setStatus] = useState(null);
   const [events, setEvents] = useState([]);
   const [trades, setTrades] = useState([]);
-  const [summary, setSummary] = useState(null);
+  const [summaryAll, setSummaryAll] = useState(null);
+  const [summaryToday, setSummaryToday] = useState(null);
+  const [perSymbolAll, setPerSymbolAll] = useState([]);
+  const [perSymbolToday, setPerSymbolToday] = useState([]);
+  const [sessionToday, setSessionToday] = useState(null);
+  const [firstTradeTime, setFirstTradeTime] = useState(null);
+  const [todayDateEt, setTodayDateEt] = useState(null);
   const [dcaWatchlist, setDcaWatchlist] = useState({ tokens: {}, labels: {}, blacklist: [] });
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -741,18 +895,30 @@ export function CryptoTab() {
       // Unified trades + summary from single endpoint (single source of truth)
       if (tradesResult.status === 'fulfilled') {
         const tradesData = tradesResult.value?.trades || [];
-        const summaryData = tradesResult.value?.summary || null;
+        const summaryAllData = tradesResult.value?.summary_all_time || tradesResult.value?.summary || null;
+        const summaryTodayData = tradesResult.value?.summary_today || null;
+        const perSymbolAllData = tradesResult.value?.per_symbol_all_time || [];
+        const perSymbolTodayData = tradesResult.value?.per_symbol_today || [];
+        const sessionTodayData = tradesResult.value?.session_today || null;
+        const firstTrade = tradesResult.value?.first_trade_time || summaryAllData?.first_trade_time || null;
+        const todayEt = tradesResult.value?.today_date_et || summaryTodayData?.today_date || null;
         setTrades(tradesData);
-        setSummary(summaryData);
+        setSummaryAll(summaryAllData);
+        setSummaryToday(summaryTodayData);
+        setPerSymbolAll(perSymbolAllData);
+        setPerSymbolToday(perSymbolTodayData);
+        setSessionToday(sessionTodayData);
+        setFirstTradeTime(firstTrade);
+        setTodayDateEt(todayEt);
         setTradesDebug({
           status: 'ok',
           endpoint: '/api/crypto/trades',
           tradesCount: tradesData.length,
-          summaryPresent: !!summaryData,
-          totalPnl: summaryData?.total_pnl,
-          totalTrades: summaryData?.total_trades,
-          dailyTrades: summaryData?.daily_trades,
-          firstTradeTime: summaryData?.first_trade_time,
+          summaryPresent: !!summaryAllData,
+          totalPnl: summaryAllData?.total_pnl,
+          totalTrades: summaryAllData?.total_trades,
+          dailyTrades: summaryTodayData?.total_trades,
+          firstTradeTime: firstTrade,
         });
       } else {
         setTradesDebug({ status: 'failed', error: tradesResult.reason?.message });
@@ -828,6 +994,8 @@ export function CryptoTab() {
   const tokens = Object.entries(dcaWatchlist?.tokens || {});
   const blacklist = dcaWatchlist?.blacklist || [];
 
+  const sessionStatus = status?.status === 'healthy' ? 'OPEN' : 'CLOSED';
+
   return (
     <div className="px-4 space-y-6">
       {/* Diagnostics Panel - gated behind VITE_DEBUG_STATUS */}
@@ -841,24 +1009,45 @@ export function CryptoTab() {
           <div style={{ color: '#ff0' }}>summary.daily_trades (today): {tradesDebug?.dailyTrades ?? 'N/A'}</div>
           <div style={{ color: '#0ff' }}>summary.total_pnl: ${tradesDebug?.totalPnl?.toFixed(2) ?? 'N/A'}</div>
           <div style={{ color: '#888' }}>first_trade_time: {tradesDebug?.firstTradeTime || 'N/A'}</div>
-          <div style={{ color: summary ? '#0f0' : '#f00' }}>Summary present: {tradesDebug?.summaryPresent ? 'YES' : 'NO'}</div>
+          <div style={{ color: summaryAll ? '#0f0' : '#f00' }}>Summary present: {tradesDebug?.summaryPresent ? 'YES' : 'NO'}</div>
           {tradesDebug?.error && <div style={{ color: '#f00' }}>Error: {tradesDebug.error}</div>}
         </div>
       )}
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <span>🪙</span> Crypto Trading Desk
-        </h1>
-        <label className="flex items-center gap-2 text-sm text-slate-400">
-          <input
-            type="checkbox"
-            checked={autoRefresh}
-            onChange={(e) => setAutoRefresh(e.target.checked)}
-            className="rounded"
-          />
-          Auto-refresh (5s)
-        </label>
+      {/* Journal Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <span>🪙</span> Crypto Daily Journal
+          </h1>
+          <div className="text-xs text-slate-500 mt-1">
+            {todayDateEt || summaryToday?.today_date || new Date().toISOString().slice(0, 10)} • Session {sessionStatus}
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-slate-400">
+          <div className="bg-slate-800 border border-slate-700 rounded px-3 py-2">
+            <div className="text-slate-500">Mode</div>
+            <div className="text-white font-mono">{status?.config?.mode?.toUpperCase() || 'PAPER'}</div>
+          </div>
+          <div className="bg-slate-800 border border-slate-700 rounded px-3 py-2">
+            <div className="text-slate-500">Position Size</div>
+            <div className="text-white font-mono">${status?.config?.position_size || status?.config?.position_size_usd || 100}</div>
+          </div>
+          <div className="bg-slate-800 border border-slate-700 rounded px-3 py-2">
+            <div className="text-slate-500">Thresholds</div>
+            <div className="text-white font-mono">
+              M {status?.config?.momentum_threshold || 1}% • D {status?.config?.dip_threshold || 1.5}%
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-400">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="rounded"
+            />
+            Auto-refresh (5s)
+          </label>
+        </div>
       </div>
 
       {/* Agent Status Grid */}
@@ -913,19 +1102,16 @@ export function CryptoTab() {
 
       {/* P&L and Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <PnLCard summary={summary} onClick={() => setShowPnlModal(true)} />
-
-        {/* Quick Stats */}
-        <button
-          type="button"
-          onClick={() => setShowActivityModal(true)}
-          className="bg-slate-800 rounded-lg p-4 border border-slate-700 text-left transition-colors cursor-pointer hover:border-cyan-500/60 hover:bg-slate-800/80"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-white">📊 Today's Activity</h3>
-            <span className="text-xs text-slate-400">tap for details</span>
-          </div>
-          <div className="space-y-2">
+        <TodaySummaryCard summaryToday={summaryToday} onClick={() => setShowActivityModal(true)} />
+        <PnLCard
+          summaryAll={summaryAll}
+          summaryToday={summaryToday}
+          firstTradeTime={firstTradeTime}
+          onClick={() => setShowPnlModal(true)}
+        />
+        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+          <h3 className="text-lg font-bold text-white mb-3">⚙️ Session Stats</h3>
+          <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-400">Scans</span>
               <span className="font-mono text-white">{status?.scans_today || events.length}</span>
@@ -935,36 +1121,13 @@ export function CryptoTab() {
               <span className="font-mono text-cyan-400">{status?.signals_today || 0}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Trades (Today)</span>
-              <span className="font-mono text-white">{summary?.daily_trades ?? 0}</span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-slate-400">Active Positions</span>
               <span className="font-mono text-yellow-400">{status?.active_positions || 0}</span>
             </div>
-          </div>
-        </button>
-
-        {/* Config */}
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <h3 className="text-lg font-bold text-white mb-3">⚙️ Configuration</h3>
-          <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-slate-400">Position Size</span>
-              <span className="font-mono text-white">${status?.config?.position_size || 100}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Momentum Threshold</span>
-              <span className="font-mono text-cyan-400">{status?.config?.momentum_threshold || 1}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Dip Threshold</span>
-              <span className="font-mono text-orange-400">{status?.config?.dip_threshold || 1.5}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Mode</span>
-              <span className={`px-1.5 py-0.5 rounded text-xs ${status?.config?.mode === 'live' ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                {status?.config?.mode?.toUpperCase() || 'PAPER'}
+              <span className="text-slate-400">Session</span>
+              <span className={`px-1.5 py-0.5 rounded text-xs ${sessionStatus === 'OPEN' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {sessionStatus}
               </span>
             </div>
           </div>
@@ -1105,16 +1268,19 @@ export function CryptoTab() {
 
       {showPnlModal && (
         <CryptoPnlModal
-          summary={summary}
-          trades={trades}
+          summaryAll={summaryAll}
+          summaryToday={summaryToday}
+          perSymbolAll={perSymbolAll}
+          firstTradeTime={firstTradeTime}
           onClose={() => setShowPnlModal(false)}
-          debugStatus={debugStatus}
         />
       )}
       {showActivityModal && (
-        <ActivityModal
+        <TodaySummaryModal
           status={status}
-          summary={summary}
+          summaryToday={summaryToday}
+          perSymbolToday={perSymbolToday}
+          sessionToday={sessionToday}
           trades={trades}
           onSelectTrade={openTradeFromActivity}
           onClose={() => setShowActivityModal(false)}
