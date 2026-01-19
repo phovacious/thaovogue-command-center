@@ -239,7 +239,7 @@ function TradeDetailModal({ trade, onClose }) {
 }
 
 // P&L Summary Card - uses summary from unified trades endpoint
-function PnLCard({ summary }) {
+function PnLCard({ summary, onClick }) {
   const totalPnl = summary?.total_pnl ?? 0;
   const dailyPnl = summary?.daily_pnl ?? 0;
   const isPositive = totalPnl >= 0;
@@ -251,12 +251,19 @@ function PnLCard({ summary }) {
     : null;
 
   return (
-    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+    <button
+      type="button"
+      onClick={onClick}
+      className="bg-slate-800 rounded-lg p-4 border border-slate-700 w-full text-left transition-colors cursor-pointer hover:border-cyan-500/60 hover:bg-slate-800/80"
+    >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-bold text-white">💰 Crypto P&L</h3>
-        {firstTradeDate && (
-          <span className="text-xs text-slate-500">Since {firstTradeDate}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {firstTradeDate && (
+            <span className="text-xs text-slate-500">Since {firstTradeDate}</span>
+          )}
+          <span className="text-xs text-slate-400">tap for details</span>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -295,6 +302,168 @@ function PnLCard({ summary }) {
               (today: <span className="text-green-400">{summary?.daily_wins ?? 0}</span>
               /<span className="text-red-400">{summary?.daily_losses ?? 0}</span>)
             </span>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// Crypto Performance Modal - detailed P&L drill-down
+function CryptoPnlModal({ summary, trades, onClose, debugStatus }) {
+  if (!summary) return null;
+
+  // Compute derived stats from trades array
+  const derivedStats = trades.reduce(
+    (acc, trade) => {
+      const pnl = parseFloat(trade.pnl) || 0;
+      if (pnl > 0) {
+        acc.winPnls.push(pnl);
+        if (pnl > acc.largestWin) acc.largestWin = pnl;
+      } else if (pnl < 0) {
+        acc.lossPnls.push(pnl);
+        if (pnl < acc.largestLoss) acc.largestLoss = pnl;
+      }
+      return acc;
+    },
+    { winPnls: [], lossPnls: [], largestWin: 0, largestLoss: 0 }
+  );
+
+  const avgWin = derivedStats.winPnls.length > 0
+    ? derivedStats.winPnls.reduce((a, b) => a + b, 0) / derivedStats.winPnls.length
+    : 0;
+  const avgLoss = derivedStats.lossPnls.length > 0
+    ? derivedStats.lossPnls.reduce((a, b) => a + b, 0) / derivedStats.lossPnls.length
+    : 0;
+  const totalWinPnl = derivedStats.winPnls.reduce((a, b) => a + b, 0);
+  const totalLossPnl = Math.abs(derivedStats.lossPnls.reduce((a, b) => a + b, 0));
+  const profitFactor = totalLossPnl > 0 ? totalWinPnl / totalLossPnl : totalWinPnl > 0 ? Infinity : 0;
+
+  // Debug logging
+  if (debugStatus) {
+    console.log('[CryptoPnlModal] Derived stats:', {
+      tradesCount: trades.length,
+      avgWin,
+      avgLoss,
+      largestWin: derivedStats.largestWin,
+      largestLoss: derivedStats.largestLoss,
+      profitFactor,
+      summary,
+    });
+  }
+
+  const totalPnl = summary.total_pnl ?? 0;
+  const dailyPnl = summary.daily_pnl ?? 0;
+  const isPositive = totalPnl >= 0;
+  const isDailyPositive = dailyPnl >= 0;
+  const firstTradeDate = summary.first_trade_time
+    ? new Date(summary.first_trade_time).toLocaleString()
+    : 'N/A';
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-800 rounded-lg p-6 max-w-lg w-full border border-slate-600 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-white">Crypto Performance</h2>
+            <p className="text-sm text-slate-400">Since {firstTradeDate}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        {/* All-Time Summary */}
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">All-Time</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-slate-400">Total P&L</div>
+              <div className={`text-2xl font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                {isPositive ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">Win Rate</div>
+              <div className="text-2xl font-mono font-bold text-cyan-400">
+                {summary.win_rate ? (summary.win_rate * 100).toFixed(1) : '0'}%
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">Total Trades</div>
+              <div className="text-lg font-mono text-white">{summary.total_trades ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">Wins / Losses</div>
+              <div className="text-lg font-mono">
+                <span className="text-green-400">{summary.wins ?? 0}</span>
+                <span className="text-slate-500"> / </span>
+                <span className="text-red-400">{summary.losses ?? 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Today Summary */}
+        <div className="mb-6 border-t border-slate-700 pt-4">
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">
+            Today ({summary.today_date || 'N/A'})
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-slate-400">Daily P&L</div>
+              <div className={`text-xl font-mono font-bold ${isDailyPositive ? 'text-green-400' : 'text-red-400'}`}>
+                {isDailyPositive ? '+' : '-'}${Math.abs(dailyPnl).toFixed(2)}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">Daily Trades</div>
+              <div className="text-lg font-mono text-white">{summary.daily_trades ?? 0}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-sm text-slate-400">Daily Wins / Losses</div>
+              <div className="text-lg font-mono">
+                <span className="text-green-400">{summary.daily_wins ?? 0}</span>
+                <span className="text-slate-500"> / </span>
+                <span className="text-red-400">{summary.daily_losses ?? 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Derived Stats */}
+        <div className="border-t border-slate-700 pt-4">
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">Performance Metrics</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-slate-400">Avg Win</div>
+              <div className="text-lg font-mono text-green-400">+${avgWin.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">Avg Loss</div>
+              <div className="text-lg font-mono text-red-400">${avgLoss.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">Largest Win</div>
+              <div className="text-lg font-mono text-green-400">+${derivedStats.largestWin.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-400">Largest Loss</div>
+              <div className="text-lg font-mono text-red-400">${derivedStats.largestLoss.toFixed(2)}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-sm text-slate-400">Profit Factor</div>
+              <div className={`text-xl font-mono font-bold ${profitFactor >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+                {profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)}
+                <span className="text-sm text-slate-500 ml-2">
+                  (sum wins / sum losses)
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -406,6 +575,7 @@ export function CryptoTab() {
   const [eventsUpdatedAt, setEventsUpdatedAt] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [selectedTrade, setSelectedTrade] = useState(null);
+  const [showPnlModal, setShowPnlModal] = useState(false);
   const [tradesDebug, setTradesDebug] = useState(null);
   const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
 
@@ -608,7 +778,7 @@ export function CryptoTab() {
 
       {/* P&L and Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <PnLCard summary={summary} />
+        <PnLCard summary={summary} onClick={() => setShowPnlModal(true)} />
 
         {/* Quick Stats */}
         <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
@@ -788,6 +958,15 @@ export function CryptoTab() {
         <TradeDetailModal
           trade={selectedTrade}
           onClose={() => setSelectedTrade(null)}
+        />
+      )}
+
+      {showPnlModal && (
+        <CryptoPnlModal
+          summary={summary}
+          trades={trades}
+          onClose={() => setShowPnlModal(false)}
+          debugStatus={debugStatus}
         />
       )}
 
