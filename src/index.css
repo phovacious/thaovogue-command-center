@@ -78,3 +78,45 @@ body {
 .price-flash {
   transition: background-color 0.3s ease;
 }
+
+/* Buttery smooth page transitions */
+.tab-content {
+  animation: fadeSlideIn 0.25s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth card interactions */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:active {
+  transform: scale(0.98);
+}
+
+/* iOS-native tap feedback */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* GPU-accelerated animations */
+.tab-content,
+.card-hover {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}

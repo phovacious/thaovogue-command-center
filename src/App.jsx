@@ -60,25 +60,27 @@ function App() {
       />
 
       <main className="max-w-7xl mx-auto py-4">
-        {activeTab === 'live' && (
-          <LiveDesk deskData={deskData} />
-        )}
+        <div key={activeTab} className="tab-content">
+          {activeTab === 'live' && (
+            <LiveDesk deskData={deskData} />
+          )}
 
-        {activeTab === 'crypto' && (
-          <CryptoTab key={refreshKey} />
-        )}
+          {activeTab === 'crypto' && (
+            <CryptoTab key={refreshKey} />
+          )}
 
-        {activeTab === 'equity' && (
-          <EquityTab key={refreshKey} />
-        )}
+          {activeTab === 'equity' && (
+            <EquityTab key={refreshKey} />
+          )}
 
-        {activeTab === 'value' && (
-          <ValueTab key={refreshKey} />
-        )}
+          {activeTab === 'value' && (
+            <ValueTab key={refreshKey} />
+          )}
 
-        {activeTab === 'themes' && (
-          <ThemesTab key={refreshKey} />
-        )}
+          {activeTab === 'themes' && (
+            <ThemesTab key={refreshKey} />
+          )}
+        </div>
       </main>
 
       {/* Footer */}
