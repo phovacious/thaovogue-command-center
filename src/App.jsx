@@ -14,9 +14,28 @@ function App() {
   const api = useApi();
   const [marketClock, setMarketClock] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [lastVpsSync, setLastVpsSync] = useState(null);
   const appVersionRaw = import.meta.env.VITE_APP_VERSION || 'dev';
   const appVersion = appVersionRaw === 'dev' ? 'dev' : appVersionRaw.slice(0, 7);
   const buildTime = import.meta.env.VITE_BUILD_TIME || 'dev';
+
+  // Format relative time for VPS sync
+  const formatSyncTime = (isoString) => {
+    if (!isoString) return null;
+    try {
+      const syncDate = new Date(isoString);
+      const now = new Date();
+      const diffMs = now - syncDate;
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return 'just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return syncDate.toLocaleDateString();
+    } catch {
+      return null;
+    }
+  };
 
   // Global refresh function
   const handleGlobalRefresh = async () => {
@@ -24,8 +43,12 @@ function App() {
       refreshWebSocket();
     }
     try {
-      const clockData = await api.fetchApi('/api/market/clock');
-      setMarketClock(clockData);
+      const [clockData, valuesData] = await Promise.allSettled([
+        api.fetchApi('/api/market/clock'),
+        api.fetchApi('/api/values-tab')
+      ]);
+      if (clockData.status === 'fulfilled') setMarketClock(clockData.value);
+      if (valuesData.status === 'fulfilled') setLastVpsSync(valuesData.value?.last_vps_sync);
     } catch (e) {
       console.error('Refresh failed:', e);
     }
@@ -116,6 +139,9 @@ function App() {
           )}
           {marketClock && (
             <span className="ml-2 text-slate-600">• {marketClock.status}</span>
+          )}
+          {lastVpsSync && (
+            <span className="ml-2 text-cyan-500">• VPS: {formatSyncTime(lastVpsSync)}</span>
           )}
         </div>
         <div className="absolute right-4 bottom-3 text-xs text-slate-600">
