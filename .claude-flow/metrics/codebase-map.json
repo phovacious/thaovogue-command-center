@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-01-23T14:14:15.841Z",
+  "projectRoot": "/root/thaovogue-command-center",
+  "structure": {
+    "hasPackageJson": true,
+    "hasTsConfig": false,
+    "hasClaudeConfig": false,
+    "hasClaudeFlow": true
+  },
+  "scannedAt": 1769177655841
+}
