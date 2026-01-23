@@ -48,6 +48,28 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Force refresh on window focus (native app feel)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('[App] Window focused - refreshing data');
+      handleGlobalRefresh();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    // Also refresh on visibility change (tab switch)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleGlobalRefresh();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-900">
       <Header

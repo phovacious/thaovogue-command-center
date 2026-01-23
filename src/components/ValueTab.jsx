@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 
-// Signal Hunting v7.1 Thresholds Display
+// Signal Hunting v7.1 Thresholds Display with Grafted DCA Logic
 function SignalHuntingCard({ data, loading }) {
   if (loading) {
     return (
@@ -19,6 +19,15 @@ function SignalHuntingCard({ data, loading }) {
   const fragilityColor = fragility >= 80 ? 'text-red-400' : fragility >= 50 ? 'text-yellow-400' : 'text-green-400';
   const fragilityBg = fragility >= 80 ? 'bg-red-500' : fragility >= 50 ? 'bg-yellow-500' : 'bg-green-500';
 
+  // Grafted DCA Logic from values_tab_spec.md
+  const DCA_LEVELS = [
+    { tranche: 1, trigger: '-30%', label: 'Initial Entry' },
+    { tranche: 2, trigger: '-40%', label: 'Adding Weakness' },
+    { tranche: 3, trigger: '-50%', label: 'Accumulating' },
+    { tranche: 4, trigger: '-60%', label: 'Heavy Accum' },
+    { tranche: 5, trigger: 'REGIME', label: 'Reversal Confirmed' },
+  ];
+
   return (
     <div className="bg-gradient-to-r from-slate-800 to-slate-800/80 rounded-lg p-4 border border-cyan-500/30">
       <div className="flex items-center justify-between mb-3">
@@ -28,29 +37,67 @@ function SignalHuntingCard({ data, loading }) {
         <span className="text-xs text-slate-400">Live Thresholds</span>
       </div>
 
+      {/* Core Signal Thresholds */}
       <div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="text-center">
+        <div className="text-center bg-slate-700/50 rounded-lg p-2">
           <div className="text-xs text-slate-400 mb-1">VOL_SPIKE</div>
           <div className="text-xl font-mono font-bold text-cyan-400">
             {signal_hunting?.volume_spike_threshold || 1.15}x
           </div>
-          <div className="text-xs text-slate-500">↓ from 1.5x</div>
+          <div className="text-xs text-green-400">Confirmation</div>
         </div>
-        <div className="text-center">
+        <div className="text-center bg-slate-700/50 rounded-lg p-2">
           <div className="text-xs text-slate-400 mb-1">STICKY</div>
           <div className="text-xl font-mono font-bold text-cyan-400">
             {signal_hunting?.sticky_seconds_threshold || 20}s
           </div>
-          <div className="text-xs text-slate-500">↓ from 30s</div>
+          <div className="text-xs text-green-400">Hold Time</div>
         </div>
-        <div className="text-center">
+        <div className="text-center bg-slate-700/50 rounded-lg p-2">
           <div className="text-xs text-slate-400 mb-1">DIP_PCT</div>
           <div className="text-xl font-mono font-bold text-cyan-400">
             {((signal_hunting?.dip_percentage || 0.015) * 100).toFixed(1)}%
           </div>
+          <div className="text-xs text-green-400">Min Dip</div>
         </div>
       </div>
 
+      {/* DCA Tranche Ladder */}
+      <div className="mb-4 pt-3 border-t border-slate-700">
+        <div className="text-xs text-slate-400 mb-2 flex items-center gap-2">
+          <span>📈</span> DCA Tranche Ladder
+        </div>
+        <div className="flex gap-1">
+          {DCA_LEVELS.map((level, i) => (
+            <div key={i} className="flex-1 text-center">
+              <div className={`h-2 rounded-full mb-1 ${
+                i === 0 ? 'bg-green-500' :
+                i === 1 ? 'bg-lime-500' :
+                i === 2 ? 'bg-yellow-500' :
+                i === 3 ? 'bg-orange-500' : 'bg-cyan-500'
+              }`} />
+              <div className="text-xs font-mono text-white">{level.trigger}</div>
+              <div className="text-[10px] text-slate-500 hidden md:block">{level.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Entry Rules */}
+      <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+        <div className="bg-slate-700/30 rounded p-2">
+          <span className="text-slate-400">Entry Regimes:</span>
+          <span className="ml-1 text-green-400">SIDEWAYS</span>
+          <span className="text-slate-500">,</span>
+          <span className="text-cyan-400"> REVERSAL</span>
+        </div>
+        <div className="bg-slate-700/30 rounded p-2">
+          <span className="text-slate-400">Whale Trap:</span>
+          <span className="ml-1 text-red-400">10-11 AM AVOID</span>
+        </div>
+      </div>
+
+      {/* Status Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-slate-700">
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">Fragility:</span>
