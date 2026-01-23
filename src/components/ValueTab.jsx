@@ -1,6 +1,75 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 
+// Signal Hunting v7.1 Thresholds Display
+function SignalHuntingCard({ data, loading }) {
+  if (loading) {
+    return (
+      <div className="bg-slate-800 rounded-lg p-4 border border-cyan-500/30 animate-pulse">
+        <div className="h-6 bg-slate-700 rounded w-48 mb-3"></div>
+        <div className="h-4 bg-slate-700 rounded w-32"></div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { signal_hunting, system_status } = data;
+  const fragility = system_status?.fragility_pct || 0;
+  const fragilityColor = fragility >= 80 ? 'text-red-400' : fragility >= 50 ? 'text-yellow-400' : 'text-green-400';
+  const fragilityBg = fragility >= 80 ? 'bg-red-500' : fragility >= 50 ? 'bg-yellow-500' : 'bg-green-500';
+
+  return (
+    <div className="bg-gradient-to-r from-slate-800 to-slate-800/80 rounded-lg p-4 border border-cyan-500/30">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-white flex items-center gap-2">
+          <span className="text-cyan-400">📊</span> Signal Hunting v7.1
+        </h3>
+        <span className="text-xs text-slate-400">Live Thresholds</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="text-center">
+          <div className="text-xs text-slate-400 mb-1">VOL_SPIKE</div>
+          <div className="text-xl font-mono font-bold text-cyan-400">
+            {signal_hunting?.volume_spike_threshold || 1.15}x
+          </div>
+          <div className="text-xs text-slate-500">↓ from 1.5x</div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs text-slate-400 mb-1">STICKY</div>
+          <div className="text-xl font-mono font-bold text-cyan-400">
+            {signal_hunting?.sticky_seconds_threshold || 20}s
+          </div>
+          <div className="text-xs text-slate-500">↓ from 30s</div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs text-slate-400 mb-1">DIP_PCT</div>
+          <div className="text-xl font-mono font-bold text-cyan-400">
+            {((signal_hunting?.dip_percentage || 0.015) * 100).toFixed(1)}%
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-3 border-t border-slate-700">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">Fragility:</span>
+          <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full ${fragilityBg} transition-all`}
+              style={{ width: `${Math.min(fragility, 100)}%` }}
+            />
+          </div>
+          <span className={`text-xs font-mono font-bold ${fragilityColor}`}>{fragility}%</span>
+        </div>
+        <div className="text-xs text-slate-500">
+          {data.values_tab_active ? '✅ Active' : '⏸️ Paused'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Portfolio Bucket Display Component
 function BucketDisplay({ buckets, totalValue }) {
   if (!buckets) return null;
@@ -722,6 +791,8 @@ export function ValueTab() {
   const [opportunities, setOpportunities] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
   const [bucketData, setBucketData] = useState(null);
+  const [signalHunting, setSignalHunting] = useState(null);
+  const [signalHuntingLoading, setSignalHuntingLoading] = useState(true);
   const [selectedBasket, setSelectedBasket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -792,18 +863,26 @@ export function ValueTab() {
       const isInitial = watchlist.length === 0 && baskets.length === 0 && opportunities.length === 0;
       if (isInitial) {
         setLoading(true);
+        setSignalHuntingLoading(true);
       }
       try {
-        // Fetch all data in parallel
-        const [basketsResult, oppsResult, watchResult, bucketsResult] = await Promise.allSettled([
+        // Fetch all data in parallel (including Signal Hunting v7.1)
+        const [basketsResult, oppsResult, watchResult, bucketsResult, signalResult] = await Promise.allSettled([
           api.fetchApi('/api/value/baskets'),
           api.fetchApi('/api/value/opportunities'),
           api.fetchApi('/api/value/watchlist'),
-          api.fetchApi('/api/value/buckets')
+          api.fetchApi('/api/value/buckets'),
+          api.fetchApi('/api/values-tab')
         ]);
 
-        const anySuccess = [basketsResult, oppsResult, watchResult, bucketsResult]
+        const anySuccess = [basketsResult, oppsResult, watchResult, bucketsResult, signalResult]
           .some((result) => result.status === 'fulfilled');
+
+        // Handle Signal Hunting v7.1 data
+        if (signalResult.status === 'fulfilled') {
+          setSignalHunting(signalResult.value);
+        }
+        setSignalHuntingLoading(false);
 
         if (basketsResult.status === 'fulfilled') {
           setBaskets(basketsResult.value?.baskets || []);
@@ -882,6 +961,11 @@ export function ValueTab() {
           {error}
         </div>
       )}
+
+      {/* Signal Hunting v7.1 Thresholds */}
+      <section>
+        <SignalHuntingCard data={signalHunting} loading={signalHuntingLoading} />
+      </section>
 
       {/* Portfolio Buckets */}
       {bucketData?.buckets && (

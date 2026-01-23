@@ -68,6 +68,9 @@ export function useApi() {
       body: JSON.stringify(request),
     });
 
+  // Signal Hunting v7.1
+  const getValuesTab = () => fetchApi('/api/values-tab');
+
   return {
     loading,
     error,
@@ -82,5 +85,6 @@ export function useApi() {
     getCopyClaudeContext,
     getCopyPositions,
     runBacktest,
+    getValuesTab,
   };
 }
