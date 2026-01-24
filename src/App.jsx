@@ -105,26 +105,27 @@ function App() {
       />
 
       <main className="max-w-7xl mx-auto py-4">
-        <div key={activeTab} className="tab-content">
-          {activeTab === 'live' && (
+        {/* Keep all tabs mounted, toggle visibility via CSS for instant switching */}
+        <div className="tab-content">
+          <div className={activeTab === 'live' ? 'block' : 'hidden'}>
             <LiveDesk deskData={deskData} />
-          )}
+          </div>
 
-          {activeTab === 'crypto' && (
-            <CryptoTab key={refreshKey} />
-          )}
+          <div className={activeTab === 'crypto' ? 'block' : 'hidden'}>
+            <CryptoTab />
+          </div>
 
-          {activeTab === 'equity' && (
-            <EquityTab key={refreshKey} />
-          )}
+          <div className={activeTab === 'equity' ? 'block' : 'hidden'}>
+            <EquityTab />
+          </div>
 
-          {activeTab === 'value' && (
-            <ValueTab key={refreshKey} />
-          )}
+          <div className={activeTab === 'value' ? 'block' : 'hidden'}>
+            <ValueTab />
+          </div>
 
-          {activeTab === 'themes' && (
-            <ThemesTab key={refreshKey} />
-          )}
+          <div className={activeTab === 'themes' ? 'block' : 'hidden'}>
+            <ThemesTab />
+          </div>
         </div>
       </main>
 
