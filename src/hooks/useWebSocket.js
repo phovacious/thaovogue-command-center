@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAfterFirstPaint } from './useAfterFirstPaint';
+import { getCache, setCache } from '../utils/cache';
 
 // Use secure WebSocket connection via nginx + SSL
 const WS_URL = import.meta.env.VITE_WS_URL || 'wss://159-65-250-246.sslip.io/ws';
@@ -6,9 +8,14 @@ const WS_URL = import.meta.env.VITE_WS_URL || 'wss://159-65-250-246.sslip.io/ws'
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
-  const [deskData, setDeskData] = useState(null);
+  // Load cached desk data for instant UI
+  const [deskData, setDeskData] = useState(() => {
+    const cached = getCache('/ws/desk');
+    return cached?.value || null;
+  });
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
+  const ready = useAfterFirstPaint(); // Defer connection until after first paint
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -30,6 +37,8 @@ export function useWebSocket() {
 
           if (message.type === 'snapshot' || message.type === 'desk_update') {
             setDeskData(message.data);
+            // Cache for instant startup next time
+            setCache('/ws/desk', message.data);
           }
         } catch (e) {
           console.error('Failed to parse message:', e);
@@ -57,7 +66,10 @@ export function useWebSocket() {
     }
   }, []);
 
+  // Defer WebSocket connection until after first paint for faster startup
   useEffect(() => {
+    if (!ready) return; // Wait for first paint
+
     connect();
 
     return () => {
@@ -68,7 +80,7 @@ export function useWebSocket() {
         wsRef.current.close();
       }
     };
-  }, [connect]);
+  }, [connect, ready]);
 
   return { isConnected, lastMessage, deskData, sendMessage };
 }

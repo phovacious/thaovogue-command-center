@@ -1,6 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useApi } from './hooks/useApi';
+import { useAfterFirstPaint } from './hooks/useAfterFirstPaint';
+import { getCache, setCache } from './utils/cache';
 import { Header } from './components/Header';
 import { LiveDesk } from './components/LiveDesk';
 
@@ -28,7 +30,12 @@ function App() {
   const [activeTab, setActiveTab] = useState('live');
   const { isConnected, deskData, refresh: refreshWebSocket } = useWebSocket();
   const api = useApi();
-  const [marketClock, setMarketClock] = useState(null);
+  const ready = useAfterFirstPaint(); // Defer network until after first paint
+  // Load cached market clock for instant UI
+  const [marketClock, setMarketClock] = useState(() => {
+    const cached = getCache('/api/market/clock');
+    return cached?.value || null;
+  });
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastVpsSync, setLastVpsSync] = useState(null);
   const appVersionRaw = import.meta.env.VITE_APP_VERSION || 'dev';
@@ -81,12 +88,15 @@ function App() {
     setRefreshKey(k => k + 1);
   };
 
-  // Fetch market clock every 30 seconds
+  // Fetch market clock every 30 seconds (deferred until after first paint)
   useEffect(() => {
+    if (!ready) return; // Wait for first paint before polling
+
     const fetchClock = async () => {
       try {
         const data = await api.fetchApi('/api/market/clock');
         setMarketClock(data);
+        setCache('/api/market/clock', data); // Cache for instant startup
       } catch (e) {
         console.error('Failed to fetch market clock:', e);
       }
@@ -95,7 +105,7 @@ function App() {
     fetchClock();
     const interval = setInterval(fetchClock, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [ready]);
 
   // Force refresh on window focus (native app feel)
   useEffect(() => {
