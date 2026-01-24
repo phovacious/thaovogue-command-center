@@ -1,12 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useApi } from './hooks/useApi';
 import { Header } from './components/Header';
 import { LiveDesk } from './components/LiveDesk';
-import { CryptoTab } from './components/CryptoTab';
-import { EquityTab } from './components/EquityTab';
-import { ValueTab } from './components/ValueTab';
-import { ThemesTab } from './components/ThemesTab';
+
+// Lazy-load non-default tabs for faster initial paint
+const CryptoTab = lazy(() => import('./components/CryptoTab').then(m => ({ default: m.CryptoTab })));
+const EquityTab = lazy(() => import('./components/EquityTab').then(m => ({ default: m.EquityTab })));
+const ValueTab = lazy(() => import('./components/ValueTab').then(m => ({ default: m.ValueTab })));
+const ThemesTab = lazy(() => import('./components/ThemesTab').then(m => ({ default: m.ThemesTab })));
+
+// Lightweight loading skeleton for lazy tabs
+function TabSkeleton() {
+  return (
+    <div className="px-4 py-8 animate-pulse">
+      <div className="h-8 bg-slate-700 rounded w-48 mb-4"></div>
+      <div className="space-y-3">
+        <div className="h-4 bg-slate-700 rounded w-full"></div>
+        <div className="h-4 bg-slate-700 rounded w-3/4"></div>
+        <div className="h-4 bg-slate-700 rounded w-1/2"></div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState('live');
@@ -18,6 +34,16 @@ function App() {
   const appVersionRaw = import.meta.env.VITE_APP_VERSION || 'dev';
   const appVersion = appVersionRaw === 'dev' ? 'dev' : appVersionRaw.slice(0, 7);
   const buildTime = import.meta.env.VITE_BUILD_TIME || 'dev';
+
+  // Perf: measure startup to first render (dev only)
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      performance.mark('app_first_render');
+      performance.measure('startup_to_first_render', 'app_start', 'app_first_render');
+      const m = performance.getEntriesByName('startup_to_first_render').pop();
+      console.log('[perf] startup_to_first_render(ms)=', m?.duration?.toFixed(1));
+    }
+  }, []);
 
   // Format relative time for VPS sync
   const formatSyncTime = (isoString) => {
@@ -106,25 +132,34 @@ function App() {
 
       <main className="max-w-7xl mx-auto py-4">
         {/* Keep all tabs mounted, toggle visibility via CSS for instant switching */}
+        {/* Lazy tabs wrapped in Suspense for code-splitting */}
         <div className="tab-content">
           <div className={activeTab === 'live' ? 'block' : 'hidden'}>
             <LiveDesk deskData={deskData} />
           </div>
 
           <div className={activeTab === 'crypto' ? 'block' : 'hidden'}>
-            <CryptoTab />
+            <Suspense fallback={<TabSkeleton />}>
+              <CryptoTab />
+            </Suspense>
           </div>
 
           <div className={activeTab === 'equity' ? 'block' : 'hidden'}>
-            <EquityTab />
+            <Suspense fallback={<TabSkeleton />}>
+              <EquityTab />
+            </Suspense>
           </div>
 
           <div className={activeTab === 'value' ? 'block' : 'hidden'}>
-            <ValueTab />
+            <Suspense fallback={<TabSkeleton />}>
+              <ValueTab />
+            </Suspense>
           </div>
 
           <div className={activeTab === 'themes' ? 'block' : 'hidden'}>
-            <ThemesTab />
+            <Suspense fallback={<TabSkeleton />}>
+              <ThemesTab />
+            </Suspense>
           </div>
         </div>
       </main>

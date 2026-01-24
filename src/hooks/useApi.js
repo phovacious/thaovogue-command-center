@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://159-65-250-246.sslip.io';
+const isDev = import.meta.env.DEV;
 
 export function useApi() {
   const [loading, setLoading] = useState(false);
@@ -15,6 +16,8 @@ export function useApi() {
     const timeoutId = controller
       ? setTimeout(() => controller.abort(), timeoutMs)
       : null;
+
+    const startTime = isDev ? performance.now() : 0;
 
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -31,9 +34,19 @@ export function useApi() {
       }
 
       const data = await response.json();
+
+      if (isDev) {
+        const duration = (performance.now() - startTime).toFixed(0);
+        console.log(`[api] ${endpoint} (${duration}ms)`);
+      }
+
       setLoading(false);
       return data;
     } catch (err) {
+      if (isDev) {
+        const duration = (performance.now() - startTime).toFixed(0);
+        console.log(`[api] ${endpoint} FAILED (${duration}ms):`, err.message);
+      }
       if (err.name === 'AbortError') {
         setError(`Timeout after ${timeoutMs}ms`);
         setLoading(false);

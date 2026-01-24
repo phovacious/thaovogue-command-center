@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../hooks/useApi';
+import { getCache, setCache } from '../utils/cache';
 
 const AGENT_DESCRIPTIONS = {
   // Crypto
@@ -937,6 +938,21 @@ export function CryptoTab() {
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [tradesDebug, setTradesDebug] = useState(null);
   const debugStatus = import.meta.env?.VITE_DEBUG_STATUS === 'true';
+  const initialLoadDone = useRef(false);
+
+  // Load from cache on mount for instant UI
+  useEffect(() => {
+    const cached = getCache('/api/crypto/trades');
+    if (cached?.value && !initialLoadDone.current) {
+      const tradesData = cached.value?.trades || [];
+      const summaryAllData = cached.value?.summary_all_time || cached.value?.summary || null;
+      const summaryTodayData = cached.value?.summary_today || null;
+      setTrades(tradesData);
+      setSummaryAll(summaryAllData);
+      setSummaryToday(summaryTodayData);
+      setLoading(false); // Show cached data immediately
+    }
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -947,6 +963,7 @@ export function CryptoTab() {
         api.fetchApi('/api/crypto/trades?limit=10'),
         api.fetchApi('/api/crypto/dca-watchlist'),
       ]);
+      initialLoadDone.current = true;
 
       if (statusResult.status === 'fulfilled') {
         const statusData = statusResult.value;
@@ -969,6 +986,9 @@ export function CryptoTab() {
 
       // Unified trades + summary from single endpoint (single source of truth)
       if (tradesResult.status === 'fulfilled') {
+        // Cache the response for instant startup next time
+        setCache('/api/crypto/trades', tradesResult.value);
+
         const tradesData = tradesResult.value?.trades || [];
         const summaryAllData = tradesResult.value?.summary_all_time || tradesResult.value?.summary || null;
         const summaryTodayData = tradesResult.value?.summary_today || null;

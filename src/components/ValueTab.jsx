@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
+import { getCache, setCache } from '../utils/cache';
 
 // Signal Hunting v7.1 Thresholds Display with Grafted DCA Logic
 function SignalHuntingCard({ data, loading }) {
@@ -853,31 +854,56 @@ export function ValueTab() {
       const safeTicker = ticker?.toUpperCase();
       if (!safeTicker) return;
       if (dcaLoading && dcaResult?.ticker === safeTicker) return;
-      setDcaLoading(true);
-      setDcaResult({
-        status: 'loading',
-        ticker: safeTicker,
-        tier: 'UNKNOWN',
-        company_name: safeTicker,
-        current_price: 'N/A',
-        high_52w: 'N/A',
-        distance_from_high: 0,
-        hold_ok: false,
-        urgency: 'WAIT',
-        urgency_icon: '⏳',
-        tranches: 0,
-        reasoning: 'Fetching recommendation...',
-        amount: 1000,
-        schedule: [],
-        warnings: [],
-      });
+
+      const cacheKey = `/api/value/dca-recommendation?ticker=${safeTicker}`;
+      const cached = getCache(cacheKey);
+
+      // Show cached data immediately if available (instant UI)
+      if (cached?.value) {
+        const cachedResult = normalizeDcaResult(cached.value, safeTicker, 1000);
+        cachedResult._fromCache = true;
+        cachedResult._cacheAge = cached.ts;
+        setDcaResult(cachedResult);
+        setSelectedBasket(null);
+
+        // If cache is fresh enough, don't refetch
+        if (!cached.isStale) {
+          return;
+        }
+        // Otherwise, refetch in background (don't show loading spinner)
+      } else {
+        // No cache: show loading state
+        setDcaLoading(true);
+        setDcaResult({
+          status: 'loading',
+          ticker: safeTicker,
+          tier: 'UNKNOWN',
+          company_name: safeTicker,
+          current_price: 'N/A',
+          high_52w: 'N/A',
+          distance_from_high: 0,
+          hold_ok: false,
+          urgency: 'WAIT',
+          urgency_icon: '⏳',
+          tranches: 0,
+          reasoning: 'Fetching recommendation...',
+          amount: 1000,
+          schedule: [],
+          warnings: [],
+        });
+      }
+
+      // Fetch fresh data
       const data = await api.fetchApi(`/api/value/dca-recommendation?ticker=${safeTicker}&amount=1000`);
       if (data.status === 'ok' || data.ticker) {
+        // Cache the result
+        setCache(cacheKey, data);
         setDcaResult(normalizeDcaResult(data, safeTicker, 1000));
-        setSelectedBasket(null); // Close basket modal
+        setSelectedBasket(null);
       }
     } catch (e) {
       console.error('DCA analysis failed:', e);
+      // Keep showing cached data if fetch fails
     } finally {
       setDcaLoading(false);
     }
