@@ -28,12 +28,23 @@ function normalizeBotStatus(status) {
 // Normalize position from API
 export function normalizePosition(raw) {
   const entryPrice = parseFloat(raw.entry_price) || 0;
-  const currentPrice = parseFloat(raw.current_price) || entryPrice;
+  const currentPrice = parseFloat(raw.current_price) || 0;
   const qty = parseFloat(raw.qty) || 0;
   const marketValue = parseFloat(raw.market_value) || (currentPrice * qty);
   const unrealizedPnl = parseFloat(raw.unrealized_pnl) || 0;
-  const unrealizedPnlPct = parseFloat(raw.unrealized_pnl_pct) ||
-    (entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0);
+  const unrealizedPnlPct = parseFloat(raw.unrealized_pnl_pct) || 0;
+  const hasLivePrice = raw.has_live_price === true;
+
+  // Mode: from API field or derive from bot name
+  const mode = raw.mode || (
+    (raw.bot_name || '').toLowerCase().includes('paper') ? 'paper' : 'live'
+  );
+
+  // Venue: from API field or derive from bot name
+  const venue = raw.venue || (
+    (raw.bot_name || '').includes('UNIFIED') ? 'kraken' :
+    (raw.bot_name || '').includes('EQUITY') ? 'schwab' : 'unknown'
+  );
 
   return {
     symbol: raw.symbol || 'UNK',
@@ -48,11 +59,18 @@ export function normalizePosition(raw) {
     entryTime: raw.entry_time || null,
     stopLoss: raw.stop_loss || null,
     takeProfit: raw.take_profit || null,
+    // New V4 fields
+    mode,
+    venue,
+    signalName: raw.signal_name || null,
+    hasLivePrice,
     // Derived fields
-    isLive: (raw.bot_name || '').includes('UNIFIED') || marketValue > 1500,
-    isPaper: marketValue <= 1000 || (raw.bot_name || '').includes('PAPER'),
-    isCrypto: (raw.bot_name || '').includes('UNIFIED'),
-    isEquity: (raw.bot_name || '').includes('EQUITY'),
+    isLive: mode === 'live',
+    isPaper: mode === 'paper',
+    isCrypto: venue === 'kraken' || (raw.bot_name || '').includes('UNIFIED'),
+    isEquity: venue === 'schwab' || (raw.bot_name || '').includes('EQUITY'),
+    // Flag for stale prices (current == entry and no live price)
+    isStalePrice: !hasLivePrice && Math.abs(currentPrice - entryPrice) < 0.001,
   };
 }
 
@@ -146,4 +164,51 @@ export function formatUptime(seconds) {
     return `${days}d ${hours % 24}h`;
   }
   return `${hours}h ${mins}m`;
+}
+
+// Format date in compact mobile-friendly way
+export function formatDate(isoString) {
+  if (!isoString) return '--';
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '--';
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+
+    // If today or yesterday, show relative
+    const now = new Date();
+    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+
+    // Otherwise show date
+    return `${month} ${day}`;
+  } catch {
+    return '--';
+  }
+}
+
+// Format date with time
+export function formatDateTime(isoString) {
+  if (!isoString) return '--';
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '--';
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    const hours = date.getHours();
+    const mins = date.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+
+    return `${month} ${day}, ${hour12}:${mins} ${ampm}`;
+  } catch {
+    return '--';
+  }
 }
