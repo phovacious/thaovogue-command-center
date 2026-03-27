@@ -95,15 +95,19 @@ export function V4Dashboard() {
     };
   }, []);
 
-  // Derived data
-  const livePositions = positions.filter(p => p.isLive || p.isCrypto);
-  const paperPositions = positions.filter(p => p.isPaper && !p.isCrypto);
+  // Derived data - filter by mode field
+  const livePositions = positions.filter(p => p.mode === 'live');
+  const paperPositions = positions.filter(p => p.mode === 'paper');
+
+  // Further split by asset type
+  const liveCrypto = livePositions.filter(p => p.isCrypto);
+  const liveEquity = livePositions.filter(p => p.isEquity);
+  const paperCrypto = paperPositions.filter(p => p.isCrypto);
+  const paperEquity = paperPositions.filter(p => p.isEquity);
+
+  // Legacy compatibility
   const cryptoPositions = positions.filter(p => p.isCrypto);
   const equityPositions = positions.filter(p => p.isEquity);
-  const liveCrypto = cryptoPositions.filter(p => p.isLive);
-  const paperCrypto = cryptoPositions.filter(p => p.isPaper);
-  const liveEquity = equityPositions.filter(p => p.isLive);
-  const paperEquity = equityPositions.filter(p => p.isPaper);
 
   const headerStats = normalizeHeaderStats(dailyPnl, bots, btcRegime);
   const runningBots = bots.filter(b => b.status === 'running').length;

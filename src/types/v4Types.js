@@ -35,10 +35,15 @@ export function normalizePosition(raw) {
   const unrealizedPnlPct = parseFloat(raw.unrealized_pnl_pct) || 0;
   const hasLivePrice = raw.has_live_price === true;
 
-  // Mode: from API field or derive from bot name
-  const mode = raw.mode || (
-    (raw.bot_name || '').toLowerCase().includes('paper') ? 'paper' : 'live'
-  );
+  // Mode: from API field, or derive from multiple fallback fields
+  let mode = raw.mode || raw.account_type || raw.source;
+  if (!mode) {
+    // Check bot name for paper indicator
+    const botName = (raw.bot_name || '').toLowerCase();
+    mode = botName.includes('paper') ? 'paper' : 'live';
+  }
+  // Normalize to 'live' or 'paper'
+  mode = (mode || '').toLowerCase().includes('paper') ? 'paper' : 'live';
 
   // Venue: from API field or derive from bot name
   const venue = raw.venue || (
@@ -56,7 +61,8 @@ export function normalizePosition(raw) {
     unrealizedPnlPct,
     marketValue,
     botName: raw.bot_name || 'UNKNOWN',
-    entryTime: raw.entry_time || null,
+    // Extract date from multiple possible fields
+    entryTime: raw.entry_time || raw.opened_at || raw.timestamp || raw.signal_time || null,
     stopLoss: raw.stop_loss || null,
     takeProfit: raw.take_profit || null,
     // New V4 fields
