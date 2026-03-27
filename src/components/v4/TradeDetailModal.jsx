@@ -123,8 +123,9 @@ export function TradeDetailModal({ position, onClose }) {
             <DetailSection title="Entry">
               <DetailRow label="Entry Price" value={`$${position.entryPrice?.toFixed(2)}`} />
               <DetailRow label="Entry Date" value={position.dateDisplay || '--'} />
-              <DetailRow label="Position Size" value={formatCurrency(position.sizeUsd || position.marketValue)} />
+              <DetailRow label="Position Size" value={formatCurrency(position.sizeUsd || position.costBasis || position.marketValue)} />
               <DetailRow label="Quantity" value={position.qty?.toFixed(4)} mono />
+              <DetailRow label="Cost Basis" value={formatCurrency(position.costBasis)} />
             </DetailSection>
 
             {/* Current Info */}
@@ -138,17 +139,24 @@ export function TradeDetailModal({ position, onClose }) {
                   position.currentPrice < position.entryPrice ? 'text-red-400' : 'text-slate-300'
                 }
               />
-              <DetailRow label="Market Value" value={isStale ? '--' : formatCurrency(position.marketValue)} />
+              <DetailRow
+                label="Market Value"
+                value={isStale ? formatCurrency(position.costBasis) + ' (cost)' : formatCurrency(position.marketValue)}
+                valueColor={isStale ? 'text-slate-500' : 'text-white'}
+              />
+              <DetailRow
+                label="P&L"
+                value={isStale ? '--' : `${formatPercent(position.unrealizedPnlPct)} / ${formatCurrency(position.unrealizedPnl)}`}
+                valueColor={pnlColor}
+              />
+              <DetailRow
+                label="Quote Status"
+                value={<QuoteStatusBadge status={position.quoteStatus} reason={position.staleReason} />}
+              />
               <DetailRow
                 label="Last Quote"
-                value={position.quoteTimeDisplay || (position.hasLivePrice ? 'Just now' : '--')}
+                value={position.quoteTimeDisplay || (position.quoteStatus === 'fresh' ? 'Just now' : '--')}
               />
-              {isStale && (
-                <DetailRow
-                  label="Status"
-                  value={<StaleBadge reason={position.staleReason} />}
-                />
-              )}
             </DetailSection>
 
             {/* Trade Parameters */}
@@ -221,6 +229,39 @@ function StaleBadge({ reason }) {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
       {reason || 'Stale'}
+    </span>
+  );
+}
+
+function QuoteStatusBadge({ status, reason }) {
+  if (status === 'fresh') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        Fresh
+      </span>
+    );
+  }
+
+  if (status === 'stale') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {reason || 'Stale'}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30">
+      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+      </svg>
+      No quote
     </span>
   );
 }

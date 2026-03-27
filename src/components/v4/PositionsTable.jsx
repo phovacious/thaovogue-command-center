@@ -25,13 +25,17 @@ function ModeBadge({ mode, venue }) {
 }
 
 /**
- * Stale price indicator
+ * Quote status indicator
  */
-function StaleBadge({ reason }) {
-  if (!reason) return null;
+function QuoteStatusBadge({ status, reason }) {
+  if (status === 'fresh') return null;
+
+  const text = status === 'missing' ? 'No quote' : (reason || 'Stale');
+  const color = status === 'missing' ? 'text-slate-500' : 'text-yellow-400/80';
+
   return (
-    <span className="text-[10px] text-yellow-400/80 whitespace-nowrap">
-      {reason}
+    <span className={`text-[10px] ${color} whitespace-nowrap`}>
+      {text}
     </span>
   );
 }
@@ -39,12 +43,13 @@ function StaleBadge({ reason }) {
 /**
  * P&L cell with proper coloring
  */
-function PnlCell({ pnlPct, pnlDollar, isStale, staleReason }) {
-  if (isStale) {
+function PnlCell({ pnlPct, pnlDollar, quoteStatus, staleReason }) {
+  // If missing quote, show em dash
+  if (quoteStatus === 'missing') {
     return (
       <div className="text-slate-500 font-mono">
         <div>—</div>
-        <StaleBadge reason={staleReason} />
+        <QuoteStatusBadge status={quoteStatus} reason={staleReason} />
       </div>
     );
   }
@@ -53,6 +58,17 @@ function PnlCell({ pnlPct, pnlDollar, isStale, staleReason }) {
   const isNegative = pnlPct < 0;
   const colorClass = isPositive ? 'text-green-400' : isNegative ? 'text-red-400' : 'text-slate-400';
 
+  // If stale but has P&L, show it with stale indicator
+  if (quoteStatus === 'stale') {
+    return (
+      <div className={`font-mono ${colorClass}`}>
+        <div className="font-medium opacity-70">{formatPercent(pnlPct)}</div>
+        <QuoteStatusBadge status={quoteStatus} reason={staleReason} />
+      </div>
+    );
+  }
+
+  // Fresh quote - show full P&L
   return (
     <div className={`font-mono ${colorClass}`}>
       <div className="font-medium">{formatPercent(pnlPct)}</div>
@@ -97,7 +113,8 @@ export function PositionsTable({ positions = [], title, emptyIcon = '📭', empt
           </thead>
           <tbody className="divide-y divide-slate-700/30">
             {positions.map((pos, idx) => {
-              const isStale = pos.isStalePrice;
+              const quoteStatus = pos.quoteStatus || (pos.hasLivePrice ? 'fresh' : 'missing');
+              const hasPriceData = quoteStatus !== 'missing';
 
               return (
                 <tr
@@ -138,10 +155,12 @@ export function PositionsTable({ positions = [], title, emptyIcon = '📭', empt
 
                   {/* Current Price */}
                   <td className="px-2 py-2 text-right">
-                    {isStale ? (
+                    {!hasPriceData ? (
                       <div className="font-mono text-slate-500">—</div>
                     ) : (
                       <div className={`font-mono ${
+                        quoteStatus === 'stale' ? 'opacity-70' : ''
+                      } ${
                         pos.currentPrice > pos.entryPrice ? 'text-green-400' :
                         pos.currentPrice < pos.entryPrice ? 'text-red-400' : 'text-slate-300'
                       }`}>
@@ -155,7 +174,7 @@ export function PositionsTable({ positions = [], title, emptyIcon = '📭', empt
                     <PnlCell
                       pnlPct={pos.unrealizedPnlPct}
                       pnlDollar={pos.unrealizedPnl}
-                      isStale={isStale}
+                      quoteStatus={quoteStatus}
                       staleReason={pos.staleReason}
                     />
                   </td>
@@ -190,7 +209,8 @@ export function PositionCards({ positions = [], onPositionClick, showMode = true
   return (
     <div className="space-y-2">
       {positions.map((pos, idx) => {
-        const isStale = pos.isStalePrice;
+        const quoteStatus = pos.quoteStatus || (pos.hasLivePrice ? 'fresh' : 'missing');
+        const hasPriceData = quoteStatus !== 'missing';
         const isPositive = pos.unrealizedPnl > 0;
         const isNegative = pos.unrealizedPnl < 0;
 
@@ -206,13 +226,15 @@ export function PositionCards({ positions = [], onPositionClick, showMode = true
                 <span className="font-mono font-bold text-white">{pos.symbol}</span>
                 {showMode && <ModeBadge mode={pos.mode} venue={pos.venue} />}
               </div>
-              {isStale ? (
+              {!hasPriceData ? (
                 <div className="flex flex-col items-end">
                   <span className="font-mono text-slate-500">—</span>
-                  <StaleBadge reason={pos.staleReason} />
+                  <QuoteStatusBadge status={quoteStatus} reason={pos.staleReason} />
                 </div>
               ) : (
                 <span className={`font-mono font-bold ${
+                  quoteStatus === 'stale' ? 'opacity-70' : ''
+                } ${
                   isPositive ? 'text-green-400' : isNegative ? 'text-red-400' : 'text-slate-400'
                 }`}>
                   {formatPercent(pos.unrealizedPnlPct)}
@@ -223,7 +245,7 @@ export function PositionCards({ positions = [], onPositionClick, showMode = true
             {/* Bottom row: Details */}
             <div className="flex justify-between text-xs text-slate-400">
               <span>Entry: ${pos.entryPrice?.toFixed(2)}</span>
-              {isStale ? (
+              {!hasPriceData ? (
                 <span className="text-slate-500">Current: —</span>
               ) : (
                 <span>Current: ${pos.currentPrice?.toFixed(2)}</span>

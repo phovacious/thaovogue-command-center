@@ -54,23 +54,35 @@ export function normalizePosition(raw) {
   // Date normalization: try multiple fields
   const rawDate = raw.entry_time || raw.opened_at || raw.timestamp || raw.signal_time || raw.created_at || null;
 
-  // Quote timestamp for staleness check
+  // Quote timestamp and status from backend
   const quoteTimestamp = raw.quote_timestamp || null;
+  const quoteStatusRaw = raw.quote_status || (hasLivePrice ? 'fresh' : 'missing');
 
-  // Determine stale reason
+  // Determine stale reason based on backend quote_status
   let staleReason = null;
-  if (!hasLivePrice) {
-    if (currentPrice === 0 || currentPrice === entryPrice) {
-      staleReason = 'No mark';
+  let quoteStatus = quoteStatusRaw;
+
+  if (quoteStatusRaw === 'missing') {
+    staleReason = 'No quote';
+  } else if (quoteStatusRaw === 'stale') {
+    // If stale, show how old
+    if (quoteTimestamp) {
+      const quoteAge = getQuoteAgeMinutes(quoteTimestamp);
+      staleReason = `${Math.round(quoteAge)}m old`;
     } else {
       staleReason = 'Stale';
     }
-  } else if (quoteTimestamp) {
+  } else if (quoteStatusRaw === 'fresh' && quoteTimestamp) {
+    // Double-check freshness in frontend (> 30 min = stale)
     const quoteAge = getQuoteAgeMinutes(quoteTimestamp);
-    if (quoteAge > 15) {
+    if (quoteAge > 30) {
       staleReason = `${Math.round(quoteAge)}m old`;
+      quoteStatus = 'stale';
     }
   }
+
+  // Cost basis
+  const costBasis = parseFloat(raw.cost_basis) || (entryPrice * qty);
 
   return {
     symbol: raw.symbol || 'UNK',
@@ -81,14 +93,16 @@ export function normalizePosition(raw) {
     unrealizedPnl,
     unrealizedPnlPct,
     marketValue,
+    costBasis,
     botName: raw.bot_name || 'UNKNOWN',
     // Date fields
     entryTime: rawDate,
     dateDisplay: formatDateTime(rawDate),
     dateShort: formatDateShort(rawDate),
-    // Price timestamp
+    // Price/quote fields
     quoteTimestamp,
     quoteTimeDisplay: quoteTimestamp ? formatRelativeTime(quoteTimestamp) : null,
+    quoteStatus,  // "fresh" | "stale" | "missing"
     // Trade params
     stopLoss: raw.stop_loss || null,
     takeProfit: raw.take_profit || null,
@@ -106,8 +120,8 @@ export function normalizePosition(raw) {
     isPaper: mode === 'paper',
     isCrypto: venue === 'kraken' || (raw.bot_name || '').includes('UNIFIED'),
     isEquity: venue === 'schwab' || (raw.bot_name || '').includes('EQUITY'),
-    // Flag for stale prices
-    isStalePrice: !hasLivePrice || staleReason !== null,
+    // Flag for stale prices - only stale if quoteStatus indicates it
+    isStalePrice: quoteStatus !== 'fresh',
   };
 }
 
