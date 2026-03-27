@@ -1,4 +1,4 @@
-import { formatCurrency, formatPercent, formatDate } from '../../types/v4Types';
+import { formatCurrency, formatPercent } from '../../types/v4Types';
 import { EmptyState } from './EmptyState';
 
 /**
@@ -25,14 +25,26 @@ function ModeBadge({ mode, venue }) {
 }
 
 /**
+ * Stale price indicator
+ */
+function StaleBadge({ reason }) {
+  if (!reason) return null;
+  return (
+    <span className="text-[10px] text-yellow-400/80 whitespace-nowrap">
+      {reason}
+    </span>
+  );
+}
+
+/**
  * P&L cell with proper coloring
  */
-function PnlCell({ pnlPct, pnlDollar, isStale }) {
+function PnlCell({ pnlPct, pnlDollar, isStale, staleReason }) {
   if (isStale) {
     return (
       <div className="text-slate-500 font-mono">
         <div>—</div>
-        <div className="text-[10px]">stale</div>
+        <StaleBadge reason={staleReason} />
       </div>
     );
   }
@@ -77,7 +89,7 @@ export function PositionsTable({ positions = [], title, emptyIcon = '📭', empt
             <tr className="text-slate-400 text-left text-xs">
               <th className="px-3 py-2 font-medium">Symbol</th>
               {showMode && <th className="px-2 py-2 font-medium">Type</th>}
-              <th className="px-2 py-2 font-medium hidden sm:table-cell">Date</th>
+              <th className="px-2 py-2 font-medium">Date</th>
               <th className="px-2 py-2 font-medium text-right">Entry</th>
               <th className="px-2 py-2 font-medium text-right">Current</th>
               <th className="px-3 py-2 font-medium text-right">P&L</th>
@@ -91,13 +103,19 @@ export function PositionsTable({ positions = [], title, emptyIcon = '📭', empt
                 <tr
                   key={`${pos.symbol}-${idx}`}
                   onClick={() => onPositionClick && onPositionClick(pos)}
-                  className="hover:bg-slate-700/30 transition-colors cursor-pointer"
+                  className="hover:bg-slate-700/30 transition-colors cursor-pointer active:bg-slate-700/50"
                 >
                   {/* Symbol + Signal */}
                   <td className="px-3 py-2">
-                    <div className="font-mono font-bold text-white">{pos.symbol}</div>
-                    <div className="text-[10px] text-slate-500">
-                      {pos.signalName || formatCurrency(pos.marketValue, 0)}
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-white">{pos.symbol}</span>
+                      {/* Tap indicator on mobile */}
+                      <svg className="w-3 h-3 text-slate-500 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      {pos.signalName || pos.tier || formatCurrency(pos.marketValue, 0)}
                     </div>
                   </td>
 
@@ -108,9 +126,9 @@ export function PositionsTable({ positions = [], title, emptyIcon = '📭', empt
                     </td>
                   )}
 
-                  {/* Date */}
-                  <td className="px-2 py-2 hidden sm:table-cell">
-                    <div className="text-xs text-slate-400">{formatDate(pos.entryTime)}</div>
+                  {/* Date - always visible now */}
+                  <td className="px-2 py-2">
+                    <div className="text-xs text-slate-400">{pos.dateShort || '--'}</div>
                   </td>
 
                   {/* Entry Price */}
@@ -138,6 +156,7 @@ export function PositionsTable({ positions = [], title, emptyIcon = '📭', empt
                       pnlPct={pos.unrealizedPnlPct}
                       pnlDollar={pos.unrealizedPnl}
                       isStale={isStale}
+                      staleReason={pos.staleReason}
                     />
                   </td>
                 </tr>
@@ -179,7 +198,7 @@ export function PositionCards({ positions = [], onPositionClick, showMode = true
           <div
             key={`${pos.symbol}-${idx}`}
             onClick={() => onPositionClick && onPositionClick(pos)}
-            className="bg-slate-800/70 rounded-lg p-3 border border-slate-700/50 cursor-pointer hover:border-cyan-500/30"
+            className="bg-slate-800/70 rounded-lg p-3 border border-slate-700/50 cursor-pointer hover:border-cyan-500/30 active:bg-slate-700/50"
           >
             {/* Top row: Symbol + Mode + P&L */}
             <div className="flex justify-between items-start mb-2">
@@ -188,7 +207,10 @@ export function PositionCards({ positions = [], onPositionClick, showMode = true
                 {showMode && <ModeBadge mode={pos.mode} venue={pos.venue} />}
               </div>
               {isStale ? (
-                <span className="font-mono text-slate-500">—</span>
+                <div className="flex flex-col items-end">
+                  <span className="font-mono text-slate-500">—</span>
+                  <StaleBadge reason={pos.staleReason} />
+                </div>
               ) : (
                 <span className={`font-mono font-bold ${
                   isPositive ? 'text-green-400' : isNegative ? 'text-red-400' : 'text-slate-400'
@@ -206,13 +228,22 @@ export function PositionCards({ positions = [], onPositionClick, showMode = true
               ) : (
                 <span>Current: ${pos.currentPrice?.toFixed(2)}</span>
               )}
-              <span>{formatDate(pos.entryTime)}</span>
+              <span>{pos.dateShort || '--'}</span>
             </div>
 
             {/* Signal name if present */}
-            {pos.signalName && (
-              <div className="mt-1 text-[10px] text-cyan-400/70">
-                Signal: {pos.signalName}
+            {(pos.signalName || pos.tier) && (
+              <div className="mt-1 flex items-center gap-2">
+                {pos.tier && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">
+                    {pos.tier}
+                  </span>
+                )}
+                {pos.signalName && pos.signalName !== pos.tier && (
+                  <span className="text-[10px] text-purple-400/70">
+                    {pos.signalName}
+                  </span>
+                )}
               </div>
             )}
           </div>

@@ -8,6 +8,7 @@ import { TradeLogFeed } from './TradeLogFeed';
 import { FleetStatusSection } from './FleetGrid';
 import { SectionCard, LoadingSkeleton, DataRefreshIndicator, EmptyState } from './EmptyState';
 import { StatusChip } from './StatusChip';
+import { TradeDetailModal } from './TradeDetailModal';
 
 const TABS = [
   { id: 'positions', label: 'Positions', icon: '📊' },
@@ -33,7 +34,20 @@ export function V4Dashboard() {
   const [events, setEvents] = useState([]);
   const [btcRegime, setBtcRegime] = useState('UNKNOWN');
 
+  // Modal state
+  const [selectedPosition, setSelectedPosition] = useState(null);
+
   const pollRef = useRef(null);
+
+  // Handle position click
+  const handlePositionClick = (position) => {
+    setSelectedPosition(position);
+  };
+
+  // Close modal
+  const handleCloseModal = () => {
+    setSelectedPosition(null);
+  };
 
   // Fetch all data
   const fetchData = async () => {
@@ -162,6 +176,7 @@ export function V4Dashboard() {
                   positions={liveCrypto}
                   emptyIcon="🪙"
                   emptyMessage="No live crypto positions"
+                  onPositionClick={handlePositionClick}
                 />
               )}
             </SectionCard>
@@ -174,7 +189,7 @@ export function V4Dashboard() {
               {isLoading ? (
                 <LoadingSkeleton rows={3} />
               ) : liveEquity.length > 0 ? (
-                <PositionsTable positions={liveEquity} />
+                <PositionsTable positions={liveEquity} onPositionClick={handlePositionClick} />
               ) : (
                 <EmptyState
                   icon="📈"
@@ -203,6 +218,7 @@ export function V4Dashboard() {
                   positions={paperEquity}
                   emptyIcon="📝"
                   emptyMessage="No equity paper trades"
+                  onPositionClick={handlePositionClick}
                 />
               )}
             </SectionCard>
@@ -219,6 +235,7 @@ export function V4Dashboard() {
                   positions={paperCrypto}
                   emptyIcon="🪙"
                   emptyMessage="No crypto paper trades"
+                  onPositionClick={handlePositionClick}
                 />
               )}
             </SectionCard>
@@ -297,6 +314,14 @@ export function V4Dashboard() {
           )}
         </div>
       </footer>
+
+      {/* Trade Detail Modal */}
+      {selectedPosition && (
+        <TradeDetailModal
+          position={selectedPosition}
+          onClose={handleCloseModal}
+        />
+      )}
     </div>
   );
 }

@@ -51,6 +51,27 @@ export function normalizePosition(raw) {
     (raw.bot_name || '').includes('EQUITY') ? 'schwab' : 'unknown'
   );
 
+  // Date normalization: try multiple fields
+  const rawDate = raw.entry_time || raw.opened_at || raw.timestamp || raw.signal_time || raw.created_at || null;
+
+  // Quote timestamp for staleness check
+  const quoteTimestamp = raw.quote_timestamp || null;
+
+  // Determine stale reason
+  let staleReason = null;
+  if (!hasLivePrice) {
+    if (currentPrice === 0 || currentPrice === entryPrice) {
+      staleReason = 'No mark';
+    } else {
+      staleReason = 'Stale';
+    }
+  } else if (quoteTimestamp) {
+    const quoteAge = getQuoteAgeMinutes(quoteTimestamp);
+    if (quoteAge > 15) {
+      staleReason = `${Math.round(quoteAge)}m old`;
+    }
+  }
+
   return {
     symbol: raw.symbol || 'UNK',
     qty,
@@ -61,23 +82,88 @@ export function normalizePosition(raw) {
     unrealizedPnlPct,
     marketValue,
     botName: raw.bot_name || 'UNKNOWN',
-    // Extract date from multiple possible fields
-    entryTime: raw.entry_time || raw.opened_at || raw.timestamp || raw.signal_time || null,
+    // Date fields
+    entryTime: rawDate,
+    dateDisplay: formatDateTime(rawDate),
+    dateShort: formatDateShort(rawDate),
+    // Price timestamp
+    quoteTimestamp,
+    quoteTimeDisplay: quoteTimestamp ? formatRelativeTime(quoteTimestamp) : null,
+    // Trade params
     stopLoss: raw.stop_loss || null,
     takeProfit: raw.take_profit || null,
-    // New V4 fields
+    // V4 fields
     mode,
     venue,
     signalName: raw.signal_name || null,
+    tier: raw.tier || null,
+    positionId: raw.position_id || null,
+    sizeUsd: parseFloat(raw.size_usd) || null,
     hasLivePrice,
+    staleReason,
     // Derived fields
     isLive: mode === 'live',
     isPaper: mode === 'paper',
     isCrypto: venue === 'kraken' || (raw.bot_name || '').includes('UNIFIED'),
     isEquity: venue === 'schwab' || (raw.bot_name || '').includes('EQUITY'),
-    // Flag for stale prices (current == entry and no live price)
-    isStalePrice: !hasLivePrice && Math.abs(currentPrice - entryPrice) < 0.001,
+    // Flag for stale prices
+    isStalePrice: !hasLivePrice || staleReason !== null,
   };
+}
+
+// Calculate quote age in minutes
+function getQuoteAgeMinutes(isoString) {
+  if (!isoString) return Infinity;
+  try {
+    const date = new Date(isoString);
+    const now = new Date();
+    return (now - date) / 60000;
+  } catch {
+    return Infinity;
+  }
+}
+
+// Format date in short form for table rows
+function formatDateShort(isoString) {
+  if (!isoString) return '--';
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) {
+      // If parsing failed, return raw string if it looks useful
+      if (typeof isoString === 'string' && isoString.length > 0 && isoString.length < 20) {
+        return isoString;
+      }
+      return '--';
+    }
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+
+    // If today, show time
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) {
+      const hours = date.getHours();
+      const mins = date.getMinutes().toString().padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const hour12 = hours % 12 || 12;
+      return `${hour12}:${mins} ${ampm}`;
+    }
+
+    // If yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    }
+
+    // Otherwise show date
+    return `${month} ${day}`;
+  } catch {
+    return '--';
+  }
 }
 
 // Normalize header stats from daily_pnl
