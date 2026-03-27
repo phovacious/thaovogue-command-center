@@ -49,30 +49,7 @@ export function V4Dashboard() {
       // Process snapshot (positions)
       if (snapshotRes.status === 'fulfilled' && snapshotRes.value) {
         const rawPositions = snapshotRes.value.positions || [];
-        console.log('[V4] Positions loaded:', rawPositions.length);
-        const normalized = rawPositions.map(p => {
-          try {
-            return normalizePosition(p);
-          } catch (err) {
-            console.error('[V4] Normalization error for', p.symbol, err);
-            // Return minimal fallback
-            return {
-              symbol: p.symbol || 'ERR',
-              mode: 'live',
-              venue: 'unknown',
-              entryPrice: p.entry_price || 0,
-              currentPrice: p.current_price || 0,
-              unrealizedPnl: 0,
-              unrealizedPnlPct: 0,
-              marketValue: 0,
-              isCrypto: false,
-              isEquity: true,
-              entryTime: null,
-              isStalePrice: true,
-            };
-          }
-        });
-        setPositions(normalized);
+        setPositions(rawPositions.map(normalizePosition));
 
         // Extract BTC regime if present
         if (snapshotRes.value.btc_regime) {
