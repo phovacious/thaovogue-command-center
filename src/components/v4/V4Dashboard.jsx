@@ -41,7 +41,7 @@ export function V4Dashboard() {
       setError(null);
 
       const [snapshotRes, botsRes, pnlRes] = await Promise.allSettled([
-        api.fetchApi('/api/desk/snapshot'),
+        api.fetchApi('/api/desk/snapshot', { timeoutMs: 20000 }), // Longer timeout for live prices
         api.fetchApi('/api/desk/bots'),
         api.fetchApi('/api/desk/pnl'),
       ]);
@@ -49,12 +49,29 @@ export function V4Dashboard() {
       // Process snapshot (positions)
       if (snapshotRes.status === 'fulfilled' && snapshotRes.value) {
         const rawPositions = snapshotRes.value.positions || [];
-        console.log('[V4Debug] Raw positions count:', rawPositions.length);
-        const normalized = rawPositions.map(normalizePosition);
-        console.log('[V4Debug] Normalized count:', normalized.length);
-        console.log('[V4Debug] Live count:', normalized.filter(p => p.mode === 'live').length);
-        console.log('[V4Debug] Paper count:', normalized.filter(p => p.mode === 'paper').length);
-        console.log('[V4Debug] Sample:', normalized[0]);
+        console.log('[V4] Positions loaded:', rawPositions.length);
+        const normalized = rawPositions.map(p => {
+          try {
+            return normalizePosition(p);
+          } catch (err) {
+            console.error('[V4] Normalization error for', p.symbol, err);
+            // Return minimal fallback
+            return {
+              symbol: p.symbol || 'ERR',
+              mode: 'live',
+              venue: 'unknown',
+              entryPrice: p.entry_price || 0,
+              currentPrice: p.current_price || 0,
+              unrealizedPnl: 0,
+              unrealizedPnlPct: 0,
+              marketValue: 0,
+              isCrypto: false,
+              isEquity: true,
+              entryTime: null,
+              isStalePrice: true,
+            };
+          }
+        });
         setPositions(normalized);
 
         // Extract BTC regime if present
