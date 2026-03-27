@@ -49,7 +49,13 @@ export function V4Dashboard() {
       // Process snapshot (positions)
       if (snapshotRes.status === 'fulfilled' && snapshotRes.value) {
         const rawPositions = snapshotRes.value.positions || [];
-        setPositions(rawPositions.map(normalizePosition));
+        console.log('[V4Debug] Raw positions count:', rawPositions.length);
+        const normalized = rawPositions.map(normalizePosition);
+        console.log('[V4Debug] Normalized count:', normalized.length);
+        console.log('[V4Debug] Live count:', normalized.filter(p => p.mode === 'live').length);
+        console.log('[V4Debug] Paper count:', normalized.filter(p => p.mode === 'paper').length);
+        console.log('[V4Debug] Sample:', normalized[0]);
+        setPositions(normalized);
 
         // Extract BTC regime if present
         if (snapshotRes.value.btc_regime) {
