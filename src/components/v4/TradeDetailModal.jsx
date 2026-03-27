@@ -34,8 +34,8 @@ export function TradeDetailModal({ position, onClose }) {
   if (!position) return null;
 
   const isStale = position.isStalePrice;
-  const isPositive = position.unrealizedPnl > 0;
-  const isNegative = position.unrealizedPnl < 0;
+  const isPositive = (position.pnlPercent ?? 0) > 0;
+  const isNegative = (position.pnlPercent ?? 0) < 0;
   const pnlColor = isStale ? 'text-slate-500' : isPositive ? 'text-green-400' : isNegative ? 'text-red-400' : 'text-slate-300';
 
   return (
@@ -77,17 +77,17 @@ export function TradeDetailModal({ position, onClose }) {
               </button>
             </div>
 
-            {/* Signal/Tier badge */}
-            {(position.signalName || position.tier) && (
+            {/* Strategy/Tier badge */}
+            {(position.strategy || position.tier || position.refLabel) && (
               <div className="flex items-center gap-2 mt-2">
                 {position.tier && (
                   <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
                     {position.tier}
                   </span>
                 )}
-                {position.signalName && position.signalName !== position.tier && (
+                {position.strategy && position.strategy !== position.tier && (
                   <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                    {position.signalName}
+                    {position.strategy}
                   </span>
                 )}
               </div>
@@ -99,7 +99,12 @@ export function TradeDetailModal({ position, onClose }) {
             <div className="text-center">
               {isStale ? (
                 <div>
-                  <div className="text-3xl font-mono text-slate-500">--</div>
+                  <div className="text-3xl font-mono text-slate-400">
+                    {position.pnlPercent != null ? formatPercent(position.pnlPercent) : '—'}
+                  </div>
+                  <div className="text-lg font-mono text-slate-500 opacity-80">
+                    {position.pnlDollar != null ? formatCurrency(position.pnlDollar) : '—'}
+                  </div>
                   <div className="text-sm text-slate-500 mt-1">
                     <StaleBadge reason={position.staleReason} />
                   </div>
@@ -107,10 +112,10 @@ export function TradeDetailModal({ position, onClose }) {
               ) : (
                 <div>
                   <div className={`text-3xl font-bold font-mono ${pnlColor}`}>
-                    {formatPercent(position.unrealizedPnlPct)}
+                    {position.pnlPercent != null ? formatPercent(position.pnlPercent) : '—'}
                   </div>
                   <div className={`text-lg font-mono ${pnlColor} opacity-80`}>
-                    {isPositive ? '+' : ''}{formatCurrency(position.unrealizedPnl)}
+                    {position.pnlDollar != null ? `${isPositive ? '+' : ''}${formatCurrency(position.pnlDollar)}` : '—'}
                   </div>
                 </div>
               )}
@@ -122,8 +127,8 @@ export function TradeDetailModal({ position, onClose }) {
             {/* Entry Info */}
             <DetailSection title="Entry">
               <DetailRow label="Entry Price" value={`$${position.entryPrice?.toFixed(2)}`} />
-              <DetailRow label="Entry Date" value={position.dateDisplay || '--'} />
-              <DetailRow label="Position Size" value={formatCurrency(position.sizeUsd || position.costBasis || position.marketValue)} />
+              <DetailRow label="Opened At" value={position.dateDisplay || '--'} />
+              <DetailRow label="Position Size" value={formatCurrency(position.notional || position.sizeUsd || position.costBasis || position.marketValue)} />
               <DetailRow label="Quantity" value={position.qty?.toFixed(4)} mono />
               <DetailRow label="Cost Basis" value={formatCurrency(position.costBasis)} />
             </DetailSection>
@@ -132,21 +137,26 @@ export function TradeDetailModal({ position, onClose }) {
             <DetailSection title="Current">
               <DetailRow
                 label="Current Price"
-                value={isStale ? '--' : `$${position.currentPrice?.toFixed(2)}`}
+                value={position.currentPrice != null ? `$${position.currentPrice?.toFixed(2)}` : '--'}
                 valueColor={
-                  isStale ? 'text-slate-500' :
+                  position.currentPrice == null ? 'text-slate-500' :
                   position.currentPrice > position.entryPrice ? 'text-green-400' :
                   position.currentPrice < position.entryPrice ? 'text-red-400' : 'text-slate-300'
                 }
               />
               <DetailRow
                 label="Market Value"
-                value={isStale ? formatCurrency(position.costBasis) + ' (cost)' : formatCurrency(position.marketValue)}
-                valueColor={isStale ? 'text-slate-500' : 'text-white'}
+                value={formatCurrency(position.marketValue)}
+                valueColor={position.currentPrice == null ? 'text-slate-500' : 'text-white'}
               />
               <DetailRow
-                label="P&L"
-                value={isStale ? '--' : `${formatPercent(position.unrealizedPnlPct)} / ${formatCurrency(position.unrealizedPnl)}`}
+                label="P&L %"
+                value={position.pnlPercent != null ? formatPercent(position.pnlPercent) : '—'}
+                valueColor={pnlColor}
+              />
+              <DetailRow
+                label="P&L $"
+                value={position.pnlDollar != null ? formatCurrency(position.pnlDollar) : '—'}
                 valueColor={pnlColor}
               />
               <DetailRow
@@ -154,8 +164,8 @@ export function TradeDetailModal({ position, onClose }) {
                 value={<QuoteStatusBadge status={position.quoteStatus} reason={position.staleReason} />}
               />
               <DetailRow
-                label="Last Quote"
-                value={position.quoteTimeDisplay || (position.quoteStatus === 'fresh' ? 'Just now' : '--')}
+                label="Quote Timestamp"
+                value={position.quoteTimestamp ? formatDateTime(position.quoteTimestamp) : '--'}
               />
             </DetailSection>
 
@@ -181,6 +191,8 @@ export function TradeDetailModal({ position, onClose }) {
 
             {/* Meta Info */}
             <DetailSection title="Info">
+              <DetailRow label="Strategy" value={position.strategy || '--'} />
+              <DetailRow label="Reference" value={position.refLabel || '--'} />
               <DetailRow label="Bot" value={position.botName} />
               <DetailRow label="Venue" value={position.venue?.charAt(0).toUpperCase() + position.venue?.slice(1)} />
               <DetailRow label="Mode" value={position.mode?.toUpperCase()} />

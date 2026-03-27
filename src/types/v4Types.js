@@ -28,12 +28,13 @@ function normalizeBotStatus(status) {
 // Normalize position from API
 export function normalizePosition(raw) {
   const entryPrice = parseFloat(raw.entry_price) || 0;
-  const currentPrice = parseFloat(raw.current_price) || 0;
+  const currentPrice = raw.current_price != null && raw.current_price !== '' ? parseFloat(raw.current_price) : null;
   const qty = parseFloat(raw.qty) || 0;
-  const marketValue = parseFloat(raw.market_value) || (currentPrice * qty);
-  const unrealizedPnl = parseFloat(raw.unrealized_pnl) || 0;
-  const unrealizedPnlPct = parseFloat(raw.unrealized_pnl_pct) || 0;
-  const hasLivePrice = raw.has_live_price === true;
+  const notional = raw.notional != null && raw.notional !== '' ? parseFloat(raw.notional) : null;
+  const marketValue = parseFloat(raw.market_value) || ((currentPrice ?? entryPrice) * qty);
+  const pnlDollar = raw.pnl_dollar != null && raw.pnl_dollar !== '' ? parseFloat(raw.pnl_dollar) : null;
+  const pnlPercent = raw.pnl_percent != null && raw.pnl_percent !== '' ? parseFloat(raw.pnl_percent) : null;
+  const hasLivePrice = raw.quote_status === 'fresh' || raw.quote_status === 'stale' ? currentPrice != null : raw.has_live_price === true;
 
   // Mode: from API field, or derive from multiple fallback fields
   let mode = raw.mode || raw.account_type || raw.source;
@@ -52,33 +53,40 @@ export function normalizePosition(raw) {
   );
 
   // Date normalization: try multiple fields
-  const rawDate = raw.entry_time || raw.opened_at || raw.timestamp || raw.signal_time || raw.created_at || null;
+  const rawDate = raw.opened_at || raw.entry_time || raw.timestamp || raw.signal_time || raw.created_at || null;
 
   // Quote timestamp and status from backend
   const quoteTimestamp = raw.quote_timestamp || null;
   const quoteStatusRaw = raw.quote_status || (hasLivePrice ? 'fresh' : 'missing');
 
-  // Determine stale reason based on backend quote_status
+  // Determine stale reason based on quote age with improved formatting:
+  // < 15 min: no label (fresh)
+  // 15-59 min: "22m old"
+  // 1-9h: "2.4h old"
+  // >= 10h: "Stale · 11.1h"
   let staleReason = null;
   let quoteStatus = quoteStatusRaw;
 
   if (quoteStatusRaw === 'missing') {
     staleReason = 'No quote';
-  } else if (quoteStatusRaw === 'stale') {
-    // If stale, show how old
-    if (quoteTimestamp) {
-      const quoteAge = getQuoteAgeMinutes(quoteTimestamp);
-      staleReason = `${Math.round(quoteAge)}m old`;
-    } else {
-      staleReason = 'Stale';
-    }
-  } else if (quoteStatusRaw === 'fresh' && quoteTimestamp) {
-    // Double-check freshness in frontend (> 30 min = stale)
-    const quoteAge = getQuoteAgeMinutes(quoteTimestamp);
-    if (quoteAge > 30) {
-      staleReason = `${Math.round(quoteAge)}m old`;
+  } else if (quoteTimestamp) {
+    const quoteAgeMinutes = getQuoteAgeMinutes(quoteTimestamp);
+
+    if (quoteStatusRaw === 'fresh') {
+      quoteStatus = 'fresh';
+      staleReason = null;
+    } else if (quoteAgeMinutes < 60) {
       quoteStatus = 'stale';
+      staleReason = `⚠ stale · ${Math.round(quoteAgeMinutes)}m ago`;
+    } else if (quoteAgeMinutes < 1440) {
+      quoteStatus = 'stale';
+      staleReason = `⚠ stale · ${(quoteAgeMinutes / 60).toFixed(1)}h ago`;
+    } else {
+      quoteStatus = 'stale';
+      staleReason = `⚠ stale · ${formatRelativeTime(quoteTimestamp)}`;
     }
+  } else if (quoteStatusRaw === 'stale') {
+    staleReason = '⚠ stale';
   }
 
   // Cost basis
@@ -90,13 +98,17 @@ export function normalizePosition(raw) {
     side: raw.side || 'long',
     entryPrice,
     currentPrice,
-    unrealizedPnl,
-    unrealizedPnlPct,
+    pnlDollar,
+    pnlPercent,
+    unrealizedPnl: pnlDollar,
+    unrealizedPnlPct: pnlPercent,
     marketValue,
     costBasis,
+    notional,
     botName: raw.bot_name || 'UNKNOWN',
     // Date fields
     entryTime: rawDate,
+    openedAt: rawDate,
     dateDisplay: formatDateTime(rawDate),
     dateShort: formatDateShort(rawDate),
     // Price/quote fields
@@ -109,6 +121,8 @@ export function normalizePosition(raw) {
     // V4 fields
     mode,
     venue,
+    strategy: raw.strategy || raw.signal_name || raw.tier || null,
+    refLabel: raw.ref_label || raw.signal_name || null,
     signalName: raw.signal_name || null,
     tier: raw.tier || null,
     positionId: raw.position_id || null,
@@ -122,6 +136,8 @@ export function normalizePosition(raw) {
     isEquity: venue === 'schwab' || (raw.bot_name || '').includes('EQUITY'),
     // Flag for stale prices - only stale if quoteStatus indicates it
     isStalePrice: quoteStatus !== 'fresh',
+    source: raw.source || null,
+    instrumentType: raw.instrument_type || (venue === 'kraken' ? 'crypto' : venue === 'schwab' ? 'equity' : 'unknown'),
   };
 }
 
@@ -137,7 +153,7 @@ function getQuoteAgeMinutes(isoString) {
   }
 }
 
-// Format date in short form for table rows
+// Format date in short form for table rows - always show "Mon DD" format
 function formatDateShort(isoString) {
   if (!isoString) return '--';
   try {
@@ -155,25 +171,7 @@ function formatDateShort(isoString) {
     const month = months[date.getMonth()];
     const day = date.getDate();
 
-    // If today, show time
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-    if (isToday) {
-      const hours = date.getHours();
-      const mins = date.getMinutes().toString().padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const hour12 = hours % 12 || 12;
-      return `${hour12}:${mins} ${ampm}`;
-    }
-
-    // If yesterday
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    }
-
-    // Otherwise show date
+    // Always show "Mon DD" format (no "Yesterday" or time-only)
     return `${month} ${day}`;
   } catch {
     return '--';
