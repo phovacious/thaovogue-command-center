@@ -66,7 +66,7 @@ function PnlCell({ pnlPct, pnlDollar, quoteStatus, staleReason }) {
 
   return (
     <div className={`font-mono ${colorClass}`}>
-      <div className="font-medium">{hasPnl ? formatPercent(pnlPct) : '—'}</div>
+      <div className="font-medium">{hasPnl ? `PNLFIELD ${formatPercent(pnlPct)}` : 'PNLFIELD —'}</div>
       <div className="text-[10px] opacity-80">
         {pnlDollar !== null && pnlDollar !== undefined ? `${pnlDollar > 0 ? '+' : ''}${formatCurrency(pnlDollar, 0)}` : '—'}
       </div>
@@ -153,7 +153,7 @@ export function PositionsTable({ positions = [], title, emptyIcon = '📭', empt
 
                   <td className="px-3 py-3 text-right">
                     <div className={`font-mono font-medium ${currentColor}`}>
-                      {pos.currentPrice != null ? `$${pos.currentPrice.toFixed(2)}` : '—'}
+                      {pos.currentPrice != null ? `LIVEFIELD $${pos.currentPrice.toFixed(2)}` : 'LIVEFIELD —'}
                     </div>
                     <PnlCell
                       pnlPct={pos.pnlPercent}
@@ -225,12 +225,12 @@ export function PositionCards({ positions = [], onPositionClick, showMode = true
                 } ${
                   isPositive ? 'text-green-400' : isNegative ? 'text-red-400' : 'text-slate-400'
                 }`}>
-                    ${pos.currentPrice?.toFixed(2)}
+                    {`LIVEFIELD $${pos.currentPrice?.toFixed(2)}`}
                   </div>
                   <div className={`font-mono text-xs ${
                     isPositive ? 'text-green-400' : isNegative ? 'text-red-400' : 'text-slate-500'
                   }`}>
-                    {pos.pnlPercent != null ? formatPercent(pos.pnlPercent) : '—'}
+                    {pos.pnlPercent != null ? `PNLFIELD ${formatPercent(pos.pnlPercent)}` : 'PNLFIELD —'}
                   </div>
                 </div>
               )}

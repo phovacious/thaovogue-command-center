@@ -9,10 +9,12 @@ import { FleetStatusSection } from './FleetGrid';
 import { SectionCard, LoadingSkeleton, DataRefreshIndicator, EmptyState } from './EmptyState';
 import { StatusChip } from './StatusChip';
 import { TradeDetailModal } from './TradeDetailModal';
+import { CompletedTradesTab } from './CompletedTradesTab';
 
 const TABS = [
   { id: 'positions', label: 'Positions', icon: '📊' },
   { id: 'paper', label: 'Paper', icon: '📝' },
+  { id: 'completed', label: 'Completed', icon: '✅' },
   { id: 'fleet', label: 'Fleet', icon: '🚀' },
   { id: 'health', label: 'Health', icon: '💓' },
   { id: 'log', label: 'Log', icon: '📋' },
@@ -33,6 +35,8 @@ export function V4Dashboard() {
   const [dailyPnl, setDailyPnl] = useState({});
   const [events, setEvents] = useState([]);
   const [btcRegime, setBtcRegime] = useState('UNKNOWN');
+  const [completedTrades, setCompletedTrades] = useState([]);
+  const [completedLoading, setCompletedLoading] = useState(false);
 
   // Modal state
   const [selectedPosition, setSelectedPosition] = useState(null);
@@ -96,6 +100,21 @@ export function V4Dashboard() {
     }
   };
 
+  // Fetch completed trades
+  const fetchCompletedTrades = async () => {
+    try {
+      setCompletedLoading(true);
+      const tradesRes = await api.fetchApi('/api/trades?limit=100&source=all');
+      if (tradesRes && tradesRes.trades) {
+        setCompletedTrades(tradesRes.trades);
+      }
+      setCompletedLoading(false);
+    } catch (err) {
+      console.error('Failed to fetch completed trades:', err);
+      setCompletedLoading(false);
+    }
+  };
+
   // Initial fetch and polling
   useEffect(() => {
     fetchData();
@@ -108,6 +127,13 @@ export function V4Dashboard() {
       }
     };
   }, []);
+
+  // Fetch completed trades when tab is selected
+  useEffect(() => {
+    if (activeTab === 'completed' && completedTrades.length === 0) {
+      fetchCompletedTrades();
+    }
+  }, [activeTab]);
 
   // Derived data - filter by mode field
   const livePositions = positions.filter(p => p.mode === 'live');
@@ -163,6 +189,11 @@ export function V4Dashboard() {
         {activeTab === 'positions' && (
           <div className="space-y-6">
             <DataRefreshIndicator lastUpdate={lastUpdate} isLoading={isLoading} />
+            <div className="rounded-xl border-2 border-fuchsia-500 bg-fuchsia-500/10 px-4 py-3 text-center">
+              <div className="text-lg font-black tracking-wide text-fuchsia-300">
+                POSITIONS_UI_V2_ACTIVE
+              </div>
+            </div>
 
             {/* Crypto Positions */}
             <SectionCard
@@ -252,6 +283,17 @@ export function V4Dashboard() {
                 <div className="text-xs text-slate-500 mt-1">WK signal monitoring active</div>
               </div>
             </SectionCard>
+          </div>
+        )}
+
+        {/* Tab: Completed Trades */}
+        {activeTab === 'completed' && (
+          <div className="space-y-6">
+            <DataRefreshIndicator lastUpdate={lastUpdate} isLoading={completedLoading} />
+            <CompletedTradesTab
+              trades={completedTrades}
+              isLoading={completedLoading}
+            />
           </div>
         )}
 
